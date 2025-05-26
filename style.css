@@ -1,51 +1,493 @@
 body {
-    font-family: sans-serif;
-    margin: 20px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f4f7f9;
+    color: #333;
     display: flex;
     flex-direction: column;
+    min-height: 100vh;
+    font-size: 16px;
+}
+
+.app-header {
+    background-color: #343a40;
+    color: white;
+    padding: 15px 25px;
+    text-align: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    /* Removed fixed h1 style, will inherit or be set below */
+}
+
+.app-header h1 {
+    margin: 0;
+    font-size: 1.8em;
+}
+
+.main-controls-container {
+    padding: 15px 25px;
+    background-color: #fff;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
     align-items: center;
 }
 
-label {
-    margin-bottom: 5px;
+.control-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* JSON Display Area - De-emphasized */
+#jsonDisplayContainer {
+    width: auto; /* Let it be controlled by its parent or defaults */
+    padding: 10px 25px;
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+#jsonDisplayToggle {
+    cursor: pointer;
+    font-size: 1.1em; /* Slightly smaller */
+    margin-bottom: 8px;
+    color: #495057;
+    user-select: none;
+    font-weight: 500;
+}
+
+#jsonDisplayToggle #jsonToggleIndicator {
+    font-size: 0.8em;
+    color: #007bff;
+    font-weight: normal;
 }
 
 #jsonDisplay {
-    width: 80%;
-    min-height: 300px;
-    margin-top: 10px;
-    margin-bottom: 10px;
+    width: 100%; /* Full width of its container */
+    min-height: 150px;
+    margin-top: 0;
+    margin-bottom: 0;
     padding: 10px;
-    border: 1px solid #ccc;
+    border: 1px solid #ced4da;
     box-sizing: border-box;
+    border-radius: 4px;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+    font-size: 0.85em;
 }
 
-.controls {
-    margin-bottom: 20px;
+#jsonDisplay.collapsed {
+    display: none;
+}
+
+/* Visual Plan - Main Focus */
+#swimlaneContainerWrapper {
+    width: auto;
+    padding: 20px 25px;
+    background-color: #e9ecef; /* Light background for the plan area */
+    flex-grow: 1; /* Takes available vertical space */
     display: flex;
-    gap: 10px;
-    align-items: center;
+    flex-direction: column;
+    overflow: hidden; /* Contains its children's overflow */
+    margin: 0; /* Remove previous margin if any */
+    border: none; /* Remove previous border */
 }
 
-button {
-    padding: 10px 15px;
+#swimlaneContainerWrapper h2 {
+    text-align: center;
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #343a40;
+    font-size: 1.5em;
+    font-weight: 600;
+}
+
+#swimlaneContainer {
+    display: flex;
+    overflow-x: auto; /* Horizontal scroll for swimlanes */
+    overflow-y: hidden;
+    padding: 15px 5px;
+    min-height: 300px;
+    gap: 20px; /* Spacing between swimlanes */
+    border-radius: 4px;
+    background-color: transparent; /* No separate background, inherits or transparent */
+    border: none; /* Cleaned up previous border */
+}
+
+/* Basic Button Styling */
+button, input[type="file"] {
+    padding: 8px 15px;
+    font-size: 0.95em;
+    border-radius: 4px;
     cursor: pointer;
+    border: 1px solid transparent;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+    font-weight: 500;
+}
+
+#saveButton, #addBucketButton, .modal-buttons button[type="submit"] {
     background-color: #007bff;
     color: white;
+    border-color: #007bff;
+}
+#saveButton:hover, #addBucketButton:hover, .modal-buttons button[type="submit"]:hover {
+    background-color: #0069d9;
+    border-color: #0062cc;
+}
+
+/* Styles for other elements like .swimlane, .itemCard, .modal remain largely the same from previous state, 
+   but would benefit from the new font and color scheme implicitly. 
+   The above changes focus on layout and emphasis. */
+
+/* Keep existing styles for swimlane, itemCard, modals etc., just ensure they fit with the new body layout */
+
+label { /* From original full set, ensure it's present if it was global */
+    margin-bottom: 5px;
+}
+
+.swimlane {
+    min-width: 280px;
+    max-width: 320px;
+    background-color: #ffffff;
+    border: 1px solid #d1d8dd;
+    border-radius: 6px;
+    padding: 15px;
+    box-shadow: 0 3px 6px rgba(0,0,0,0.08);
+    flex-grow: 0;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    transition: box-shadow 0.3s ease;
+}
+.swimlane:hover {
+    box-shadow: 0 5px 12px rgba(0,0,0,0.12);
+}
+
+.swimlane-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    margin-bottom: 8px;
+    border-bottom: 1px solid #e9ecef;
+    padding-bottom: 8px;
+}
+
+.swimlane-header h3 {
+    margin: 0;
+    font-size: 1.25em;
+    color: #2a2f33;
+    font-weight: 600;
+    flex-grow: 1;
+    text-align: left;
+}
+
+.remove-bucket-btn {
+    background: none;
     border: none;
+    color: #c82333;
+    font-size: 1.4em;
+    font-weight: bold;
+    cursor: pointer;
+    padding: 0 5px;
+    line-height: 1;
+    transition: color 0.2s ease;
+}
+.remove-bucket-btn:hover {
+    color: #a01c28;
+}
+
+.bucket-description {
+    font-size: 0.85em;
+    color: #5a6268;
+    font-style: italic;
+    text-align: left;
+    margin-top: 0;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px dashed #e0e0e0;
+    word-break: break-word;
+}
+
+.itemCard {
+    background-color: #f8f9fa;
+    border: 1px solid #e0e6eb;
+    border-radius: 5px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    font-size: 0.9em;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.itemCard:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 3px 6px rgba(0,0,0,0.08);
+}
+
+.itemIdDisplay {
+    display: block;
+    font-size: 0.7em;
+    color: #6c757d;
+    margin-bottom: 4px;
+    text-align: right;
+    font-weight: 500;
+}
+
+.itemCard h4 {
+    margin-top: 0;
+    margin-bottom: 6px;
+    font-size: 1.05em;
+    color: #343a40;
+    font-weight: 600;
+}
+
+.itemCard a.item-name-link {
+    text-decoration: none;
+    color: #007bff;
+    transition: color 0.2s ease;
+}
+.itemCard a.item-name-link:hover {
+    color: #0056b3;
+    text-decoration: underline;
+}
+
+.itemCard p {
+    margin-top: 0;
+    margin-bottom: 8px;
+    font-size: 0.9em;
+    color: #495057;
+    max-height: 70px;
+    overflow-y: auto;
+    line-height: 1.5;
+}
+
+.item-efforts {
+    font-size: 0.8em;
+    color: #5a6268;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed #e0e6eb;
+    display: flex;
+    justify-content: space-around;
+}
+
+.item-efforts span {
+    flex-basis: 30%; /* Distribute space */
+    text-align: center;
+}
+
+.item-controls {
+    margin-top: 10px;
+    display: flex;
+    justify-content: flex-end; /* Align buttons to the right */
+    gap: 8px;
+}
+
+.item-btn {
+    padding: 5px 10px;
+    font-size: 0.85em;
+}
+
+.item-btn-modify {
+    background-color: #ffc107;
+    color: #212529;
+    border-color: #ffc107;
+}
+.item-btn-modify:hover {
+    background-color: #e0a800;
+    border-color: #d39e00;
+}
+
+.item-btn-delete {
+    background-color: #dc3545;
+    color: white;
+    border-color: #dc3545;
+}
+.item-btn-delete:hover {
+    background-color: #c82333;
+    border-color: #bd2130;
+}
+
+.add-item-btn {
+    display: block;
+    width: 100%;
+    margin: 15px 0 5px 0;
+    padding: 10px 12px;
+    background-color: #28a745;
+    color: white;
+    border: none;
+    font-size: 0.9em;
+    text-align: center;
+}
+.add-item-btn:hover {
+    background-color: #218838;
+}
+
+.bucket-effort-summary {
+    margin-top: 15px;
+    padding-top: 10px;
+    /* border-top: 1px solid #adb5bd; */ /* Replaced by hr in HTML for clarity */
+    font-size: 0.85em;
+}
+
+.bucket-effort-summary hr {
+    border: none;
+    border-top: 1px solid #adb5bd;
+    margin-bottom: 10px;
+}
+
+.bucket-effort-summary p {
+    margin-top: 0;
+    margin-bottom: 8px;
+    font-weight: 600; /* Make "Total Efforts:" bold */
+    text-align: center;
+    color: #343a40;
+}
+
+.bucket-effort-summary span {
+    display: block; /* Each effort on a new line */
+    margin-bottom: 4px;
+    color: #495057;
+    text-align: center; /* Center individual lines */
+}
+.bucket-effort-summary span strong {
+    color: #212529;
+}
+
+/* Modal Styling (Refined) */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1050;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow-y: auto;
+    background-color: rgba(0,0,0,0.5);
+    backdrop-filter: blur(3px);
+}
+
+.modal-content {
+    background-color: #fff;
+    margin: 8% auto;
+    padding: 25px 30px;
+    border: none;
+    width: 90%;
+    max-width: 550px;
+    border-radius: 8px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    position: relative;
+}
+
+.modal-content h2 {
+    margin-top: 0;
+    border-bottom: 1px solid #e9ecef;
+    padding-bottom: 15px;
+    margin-bottom: 25px;
+    font-size: 1.6em;
+    color: #343a40;
+    font-weight: 600;
+}
+
+.modal-content label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 500;
+    color: #495057;
+}
+
+.modal-content input[type="text"],
+.modal-content input[type="number"],
+.modal-content textarea,
+.modal-content select {
+    width: 100%;
+    padding: 10px 12px;
+    margin-bottom: 18px;
+    border: 1px solid #ced4da;
     border-radius: 4px;
+    box-sizing: border-box;
+    font-size: 0.95em;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.modal-content input[type="text"]:focus,
+.modal-content input[type="number"]:focus,
+.modal-content textarea:focus,
+.modal-content select:focus {
+    border-color: #80bdff;
+    outline: 0;
+    box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
 }
 
-button:hover {
-    background-color: #0056b3;
+.modal-content textarea {
+    min-height: 100px;
+    resize: vertical;
 }
 
-input[type="file"] {
-    border: 1px solid #ccc;
-    padding: 8px;
-    border-radius: 4px;
+.modal-buttons {
+    text-align: right;
+    margin-top: 25px;
+    padding-top: 15px;
+    border-top: 1px solid #e9ecef;
 }
 
-h1 {
-    margin-bottom: 20px;
+.modal-buttons button {
+    margin-left: 10px;
+    padding: 10px 20px;
+}
+.modal-buttons button[type="button"] { /* Cancel button style */
+    background-color: #6c757d;
+    color: white;
+    border-color: #6c757d;
+}
+.modal-buttons button[type="button"]:hover {
+    background-color: #5a6268;
+    border-color: #545b62;
+}
+
+.close-btn {
+    position: absolute;
+    top: 15px;
+    right: 20px;
+    color: #888;
+    font-size: 2em;
+    font-weight: bold;
+    line-height: 1;
+    cursor: pointer;
+    transition: color 0.2s ease;
+}
+.close-btn:hover,
+.close-btn:focus {
+    color: #333;
+    text-decoration: none;
+}
+
+#arrowCanvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.effort-inputs {
+    display: flex;
+    justify-content: space-between;
+    gap: 15px; /* Space between effort input groups */
+    margin-top: 10px;
+    margin-bottom: 10px; /* Added to give space before modal buttons */
+}
+
+.effort-inputs > div {
+    flex: 1; /* Each effort input group takes equal width */
+}
+
+.effort-inputs label {
+    font-size: 0.9em; /* Slightly smaller labels for efforts */
+}
+
+.effort-inputs input[type="number"] {
+    margin-bottom: 0; /* Remove default bottom margin as it's handled by the container */
 } 

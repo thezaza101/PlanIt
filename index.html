@@ -14,62 +14,90 @@
         <input type="file" id="fileInput" accept=".json">
     </div>
 
-    <textarea id="jsonDisplay" placeholder="JSON content will appear here..."></textarea>
+    <div id="jsonDisplayContainer">
+        <h2 id="jsonDisplayToggle">JSON Data (Raw) <span id="jsonToggleIndicator">(Hide)</span></h2>
+        <textarea id="jsonDisplay" placeholder="JSON content will appear here..."></textarea>
+    </div>
+
+    <div class="controls" style="margin-top: 20px; margin-bottom: 0px; justify-content: flex-start;">
+        <button id="addBucketButton">+ Add New Bucket</button>
+    </div>
+
+    <div id="swimlaneContainerWrapper">
+        <h2>Visual Plan</h2>
+        <div id="swimlaneContainer"></div>
+        <svg id="arrowCanvas"></svg>
+    </div>
 
     <div class="controls">
         <button id="saveButton">Save/Download JSON</button>
     </div>
 
-    <script>
-        const fileInput = document.getElementById('fileInput');
-        const jsonDisplay = document.getElementById('jsonDisplay');
-        const saveButton = document.getElementById('saveButton');
-        let originalFileName = 'edited_data.json';
+    <!-- Item Add/Edit Modal -->
+    <div id="itemModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal()">&times;</span>
+            <h2 id="modalTitle">Add/Edit Item</h2>
+            <form id="itemForm">
+                <input type="hidden" id="itemId" name="id">
+                
+                <label for="itemName">Name:</label>
+                <input type="text" id="itemName" name="name" required>
 
-        fileInput.addEventListener('change', function(event) {
-            const file = event.target.files[0];
-            if (file) {
-                originalFileName = file.name;
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    try {
-                        const content = e.target.result;
-                        // Attempt to parse to ensure it's valid JSON, then stringify for display
-                        const parsedJson = JSON.parse(content);
-                        jsonDisplay.value = JSON.stringify(parsedJson, null, 4); // Pretty print
-                    } catch (error) {
-                        alert('Error parsing JSON file: ' + error.message);
-                        jsonDisplay.value = "Error: Could not load or parse the JSON file. Please ensure it's a valid JSON format.";
-                    }
-                };
-                reader.onerror = function() {
-                    alert('Error reading file.');
-                    jsonDisplay.value = "Error: Could not read the file.";
-                };
-                reader.readAsText(file);
-            }
-        });
+                <label for="itemDescription">Description:</label>
+                <textarea id="itemDescription" name="description"></textarea>
 
-        saveButton.addEventListener('click', function() {
-            let contentToSave = jsonDisplay.value;
-            try {
-                // Validate that the content is valid JSON before saving
-                JSON.parse(contentToSave); 
-            } catch (error) {
-                alert('The content in the editor is not valid JSON. Please correct it before saving.\nError: ' + error.message);
-                return;
-            }
+                <label for="itemBucket">Bucket:</label>
+                <select id="itemBucket" name="bucket" required>
+                    <!-- Options will be populated by JavaScript -->
+                </select>
 
-            const blob = new Blob([contentToSave], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = originalFileName; // Suggest the original file name or a default
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        });
-    </script>
+                <label for="itemPredecessors">Predecessor IDs (comma-separated):</label>
+                <input type="text" id="itemPredecessors" name="predecessors">
+
+                <div class="effort-inputs">
+                    <div>
+                        <label for="itemDesignEffort">Design Effort:</label>
+                        <input type="number" id="itemDesignEffort" name="design_effort" min="0" step="0.5">
+                    </div>
+                    <div>
+                        <label for="itemBuildEffort">Build Effort:</label>
+                        <input type="number" id="itemBuildEffort" name="build_effort" min="0" step="0.5">
+                    </div>
+                    <div>
+                        <label for="itemTestEffort">Test Effort:</label>
+                        <input type="number" id="itemTestEffort" name="test_effort" min="0" step="0.5">
+                    </div>
+                </div>
+                
+                <div class="modal-buttons">
+                    <button type="button" onclick="closeModal()">Cancel</button>
+                    <button type="submit" id="saveItemButton">Save Item</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Bucket Add/Edit Modal -->
+    <div id="bucketModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeBucketModal()">&times;</span>
+            <h2 id="bucketModalTitle">Add New Bucket</h2>
+            <form id="bucketForm">
+                <label for="bucketName">Bucket Name:</label>
+                <input type="text" id="bucketNameInput" name="bucketName" required>
+
+                <label for="bucketDescription">Bucket Description:</label>
+                <textarea id="bucketDescriptionInput" name="bucketDescription"></textarea>
+                
+                <div class="modal-buttons">
+                    <button type="button" onclick="closeBucketModal()">Cancel</button>
+                    <button type="submit" id="saveBucketButton">Save Bucket</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="app.js" defer></script>
 </body>
 </html>

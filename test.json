@@ -1,4 +1,5 @@
 {
+    "link_base": "https://www.google.com?search?q={id}",
     "buckets": [
         {
             "name": "PI44",
@@ -30,28 +31,40 @@
             "id": 16546546,
             "name": "Create app skeleton",
             "bucket": "PI44",
-            "description": "a lot of text..."
+            "description": "a lot of text...",
+            "design_effort": 2,
+            "build_effort": 5,
+            "test_effort": 3
         },
         {
             "id": 16546547,
             "predecessor": 16546546,
             "name": "implement basic auth",
             "bucket": "PI45",
-            "description": "a lot of text..."
+            "description": "a lot of text...",
+            "design_effort": 3,
+            "build_effort": 8,
+            "test_effort": 4
         },
         {
             "id": 16546548,
             "predecessor": 16546546,
             "name": "setup database",
             "bucket": "PI45",
-            "description": "a lot of text..."
+            "description": "a lot of text...",
+            "design_effort": 1,
+            "build_effort": 4,
+            "test_effort": 2
         },
         {
             "id": 16546549,
             "predecessor": [16546547, 16546548],
             "name": "user profile creation",
             "bucket": "PI46",
-            "description": "a lot of text..."
+            "description": "a lot of text...",
+            "design_effort": 4,
+            "build_effort": 10,
+            "test_effort": 6
         }
     ]
 }

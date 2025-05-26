@@ -1,0 +1,8 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+Always use native javascript without dependencies or server.
+
+use style.css for all styling
