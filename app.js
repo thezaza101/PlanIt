@@ -16,10 +16,23 @@ const itemBuildEffortInput = document.getElementById('itemBuildEffort');
 const itemTestEffortInput = document.getElementById('itemTestEffort');
 const itemStatusSelect = document.getElementById('itemStatus');
 
+// Filter Elements (to be added in HTML later)
+let filterContainer = null; // Will be assigned in DOMContentLoaded
+let allUniqueTags = new Set();
+// let activeTagFilters = new Set(); // Old filter state - REMOVE or replace
+
+let tagVisibilityState = {}; // For Filter A: { tag1: 'show', tag2: 'hide', ... }
+let focusTagState = { enabled: false, selectedTag: null }; // For Filter B
+
 // JSON Display Toggle Elements
 const jsonDisplayContainer = document.getElementById('jsonDisplayContainer'); // Though not directly used in toggle, good to have if needed
 const jsonDisplayToggle = document.getElementById('jsonDisplayToggle');
 const jsonToggleIndicator = document.getElementById('jsonToggleIndicator');
+
+// Analytics Section Elements
+const analyticsToggle = document.getElementById('analyticsToggle');
+const analyticsToggleIndicator = document.getElementById('analyticsToggleIndicator');
+const analyticsContent = document.getElementById('analyticsContent');
 
 // Bucket Modal Elements
 const addBucketButton = document.getElementById('addBucketButton');
@@ -32,17 +45,40 @@ const bucketDescriptionInput = document.getElementById('bucketDescriptionInput')
 let originalFileName = 'edited_data.json';
 let jsonData = null;
 
+function extractTagsFromString(text) {
+    if (!text || typeof text !== 'string') return [];
+    const matches = text.match(/\[(.*?)\]/g); // Find all [TAG] occurrences
+    if (matches) {
+        return matches.map(tag => tag.substring(1, tag.length - 1)); // Remove brackets
+    }
+    return [];
+}
+
 // Initialize JSON display state from localStorage
 if (jsonDisplayToggle && jsonDisplay && jsonToggleIndicator) {
-    // Default to collapsed if not explicitly set to 'false'
     const isJsonCollapsed = localStorage.getItem('jsonDisplayCollapsed') !== 'false';
     if (isJsonCollapsed) {
         jsonDisplay.classList.add('collapsed');
         jsonToggleIndicator.textContent = '(Show)';
     } else {
-        jsonDisplay.classList.remove('collapsed'); // Ensure it is expanded
+        jsonDisplay.classList.remove('collapsed');
         jsonToggleIndicator.textContent = '(Hide)';
     }
+    // Arrows will be drawn by initial renderSwimlanes if data loads,
+    // or if a toggle happens before data load, nothing happens, which is fine.
+}
+
+// Initialize Analytics display state from localStorage
+if (analyticsToggle && analyticsContent && analyticsToggleIndicator) {
+    const isAnalyticsCollapsed = localStorage.getItem('analyticsCollapsed') !== 'false';
+    if (isAnalyticsCollapsed) {
+        analyticsContent.classList.add('collapsed');
+        analyticsToggleIndicator.textContent = '(Show)';
+    } else {
+        analyticsContent.classList.remove('collapsed');
+        analyticsToggleIndicator.textContent = '(Hide)';
+    }
+    // Arrows will be drawn by initial renderSwimlanes if data loads.
 }
 
 fileInput.addEventListener('change', function(event) {
@@ -55,6 +91,18 @@ fileInput.addEventListener('change', function(event) {
                 const content = e.target.result;
                 jsonData = JSON.parse(content);
                 jsonDisplay.value = JSON.stringify(jsonData, null, 4);
+
+                // Process tags from items
+                allUniqueTags.clear();
+                if (jsonData.items) {
+                    jsonData.items.forEach(item => {
+                        item.extractedTags = extractTagsFromString(item.name);
+                        item.extractedTags.forEach(tag => allUniqueTags.add(tag));
+                    });
+                }
+                renderFilterUI(); // Render filter options
+                calculateAndRenderAnalytics(); // Calculate and Render Analytics
+
                 renderSwimlanes(jsonData);
                 populateBucketSelector();
                 requestAnimationFrame(() => {
@@ -103,22 +151,57 @@ saveButton.addEventListener('click', function() {
 swimlaneContainer.addEventListener('scroll', function() {
     if (jsonData) {
         requestAnimationFrame(() => {
-            drawDependencyArrows(jsonData);
+            if (typeof getFilteredDataForArrows === 'function') {
+                drawDependencyArrows(getFilteredDataForArrows());
+            }
         });
     }
 });
 
 function renderSwimlanes(data) {
     swimlaneContainer.innerHTML = '';
+    arrowCanvas.innerHTML = ''; // Clear arrows before re-rendering swimlanes
 
     if (!data || !data.buckets || !data.items) {
         swimlaneContainer.innerHTML = '<p style="text-align:center; color: #777;">No data to display or data is not in the expected format (missing buckets or items).</p>';
         return;
     }
 
+    // Apply new filter logic
+    let itemsToConsider = data.items;
+
+    // --- Apply Filter B (Focus) first ---
+    if (focusTagState.enabled && focusTagState.selectedTag) {
+        itemsToConsider = itemsToConsider.filter(item => 
+            item.extractedTags && item.extractedTags.includes(focusTagState.selectedTag)
+        );
+    }
+
+    // --- Apply Filter A (Visibility) to the (potentially focused) set ---
+    const itemsToDisplay = itemsToConsider.filter(item => {
+        if (!item.extractedTags || item.extractedTags.length === 0) {
+            return true; // Show items with no tags by default
+        }
+        // Show if ANY tag is set to 'show'. Hide if ALL tags are 'hide' or not in state (defaulting to hide implicitly then)
+        let canShow = false;
+        for (const tag of item.extractedTags) {
+            if (tagVisibilityState[tag] === 'show') {
+                canShow = true;
+                break;
+            }
+        }
+        return canShow;
+    });
+
     data.buckets.forEach(bucket => {
         const swimlaneDiv = document.createElement('div');
         swimlaneDiv.className = 'swimlane';
+        swimlaneDiv.setAttribute('data-bucket-name', bucket.name); // For drop target identification
+
+        // Drag and Drop Event Listeners for Swimlane (Drop Target)
+        swimlaneDiv.addEventListener('dragover', handleDragOver);
+        swimlaneDiv.addEventListener('dragleave', handleDragLeave);
+        swimlaneDiv.addEventListener('drop', (event) => handleDrop(event, bucket.name));
 
         const swimlaneHeader = document.createElement('div');
         swimlaneHeader.className = 'swimlane-header';
@@ -143,7 +226,7 @@ function renderSwimlanes(data) {
             swimlaneDiv.appendChild(bucketDesc);
         }
 
-        const itemsInBucket = data.items.filter(item => item.bucket === bucket.name);
+        const itemsInBucket = itemsToDisplay.filter(item => item.bucket === bucket.name);
 
         if (itemsInBucket.length === 0) {
             const noItemsMsg = document.createElement('p');
@@ -155,7 +238,10 @@ function renderSwimlanes(data) {
         }
         itemsInBucket.forEach(item => {
             const itemCardDiv = document.createElement('div');
-            itemCardDiv.className = 'itemCard';
+            itemCardDiv.className = 'itemCard'; // Base class
+            itemCardDiv.setAttribute('draggable', 'true'); // Make item draggable
+            itemCardDiv.addEventListener('dragstart', (event) => handleDragStart(event, item.id));
+            itemCardDiv.addEventListener('dragend', handleDragEnd); // To clean up dragging class
             const statusClass = `item-status-${(item.status || 'new').replace(/\s+/g, '_').toLowerCase()}`;
             if (item.status && item.status !== 'new') {
                  itemCardDiv.classList.add(statusClass);
@@ -196,6 +282,7 @@ function renderSwimlanes(data) {
                 <span>D: <strong>${item.design_effort || 0}</strong></span>
                 <span>B: <strong>${item.build_effort || 0}</strong></span>
                 <span>T: <strong>${item.test_effort || 0}</strong></span>
+                <span>Total: <strong>${item.total_effort || 0}</strong></span>
             `;
             itemCardDiv.appendChild(effortsDiv);
 
@@ -249,15 +336,18 @@ function renderSwimlanes(data) {
         swimlaneContainer.appendChild(swimlaneDiv);
     });
     
-    if (data.buckets.length === 0){
-         swimlaneContainer.innerHTML = '<p style="text-align:center; color: #777;">No buckets found in the data.</p>';
-    }
+    // Centralized call to draw arrows after swimlanes are rendered and DOM updated.
+    requestAnimationFrame(() => { 
+        if (typeof getFilteredDataForArrows === 'function') {
+            drawDependencyArrows(getFilteredDataForArrows());
+        }
+    });
 }
 
 function drawDependencyArrows(data) {
     arrowCanvas.innerHTML = '';
 
-    if (!data || !data.items) {
+    if (!data || !data.items || data.items.length === 0) { // Added check for empty items array
         return;
     }
 
@@ -269,7 +359,7 @@ function drawDependencyArrows(data) {
     marker.setAttribute('id', 'arrowhead');
     marker.setAttribute('markerWidth', '10');
     marker.setAttribute('markerHeight', '7');
-    marker.setAttribute('refX', '0');
+    marker.setAttribute('refX', '10');
     marker.setAttribute('refY', '3.5');
     marker.setAttribute('orient', 'auto');
     const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
@@ -279,30 +369,57 @@ function drawDependencyArrows(data) {
     defs.appendChild(marker);
     arrowCanvas.appendChild(defs);
 
-    data.items.forEach(item => {
-        if (item.predecessor) {
-            const predecessors = Array.isArray(item.predecessor) ? item.predecessor : [item.predecessor];
-            const targetElement = swimlaneContainer.querySelector(`.itemCard[data-id='${item.id}']`);
+    data.items.forEach(successorItem => {
+        if (successorItem.predecessor) {
+            const predecessors = Array.isArray(successorItem.predecessor) ? successorItem.predecessor : [successorItem.predecessor];
+            const successorElement = swimlaneContainer.querySelector(`.itemCard[data-id='${successorItem.id}']`);
 
-            if (!targetElement) return;
+            if (!successorElement) return;
 
-            const targetRect = targetElement.getBoundingClientRect();
-            const targetX = targetRect.left - arrowCanvasRect.left + swimlaneContainer.scrollLeft;
-            const targetY = targetRect.top - arrowCanvasRect.top + targetRect.height / 2 + swimlaneContainer.scrollTop;
+            const successorRect = successorElement.getBoundingClientRect();
 
             predecessors.forEach(predId => {
-                const predElement = swimlaneContainer.querySelector(`.itemCard[data-id='${predId}']`);
-                if (!predElement) return;
+                const predecessorItem = data.items.find(p => p.id === predId);
+                if (!predecessorItem) return;
 
-                const predRect = predElement.getBoundingClientRect();
-                const predX = predRect.right - arrowCanvasRect.left + swimlaneContainer.scrollLeft;
-                const predY = predRect.top - arrowCanvasRect.top + predRect.height / 2 + swimlaneContainer.scrollTop;
+                const predecessorElement = swimlaneContainer.querySelector(`.itemCard[data-id='${predId}']`);
+                if (!predecessorElement) return;
+
+                const predecessorRect = predecessorElement.getBoundingClientRect();
+
+                let x1, y1, x2, y2; // Start (predecessor) and End (successor) points for the arrow
+
+                if (successorItem.bucket === predecessorItem.bucket) {
+                    // Same bucket: Draw a vertical arrow
+                    if (predecessorRect.top < successorRect.top) { // Predecessor is visually above successor
+                        x1 = predecessorRect.left - arrowCanvasRect.left + predecessorRect.width / 2; // Bottom-center of predecessor
+                        y1 = predecessorRect.bottom - arrowCanvasRect.top;
+                        x2 = successorRect.left - arrowCanvasRect.left + successorRect.width / 2;   // Top-center of successor
+                        y2 = successorRect.top - arrowCanvasRect.top;
+                    } else { // Predecessor is visually below or at the same level as successor
+                        x1 = predecessorRect.left - arrowCanvasRect.left + predecessorRect.width / 2; // Top-center of predecessor
+                        y1 = predecessorRect.top - arrowCanvasRect.top;
+                        x2 = successorRect.left - arrowCanvasRect.left + successorRect.width / 2;   // Bottom-center of successor
+                        y2 = successorRect.bottom - arrowCanvasRect.top;
+                    }
+                } else {
+                    // Different buckets: Draw a horizontal-ish arrow (original logic)
+                    x1 = predecessorRect.right - arrowCanvasRect.left;                       // Right-middle of predecessor
+                    y1 = predecessorRect.top - arrowCanvasRect.top + predecessorRect.height / 2;
+                    x2 = successorRect.left - arrowCanvasRect.left;                          // Left-middle of successor
+                    y2 = successorRect.top - arrowCanvasRect.top + successorRect.height / 2;
+                }
+                
+                // Prevent drawing arrow if start and end points are identical or extremely close
+                if (Math.hypot(x2 - x1, y2 - y1) < 2) { // Check if distance is less than 2px
+                    return; 
+                }
 
                 const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                line.setAttribute('x1', predX.toString());
-                line.setAttribute('y1', predY.toString());
-                line.setAttribute('x2', targetX.toString());
-                line.setAttribute('y2', targetY.toString());
+                line.setAttribute('x1', x1.toString());
+                line.setAttribute('y1', y1.toString());
+                line.setAttribute('x2', x2.toString());
+                line.setAttribute('y2', y2.toString());
                 line.setAttribute('stroke', '#555');
                 line.setAttribute('stroke-width', '1.5');
                 line.setAttribute('marker-end', 'url(#arrowhead)');
@@ -312,24 +429,55 @@ function drawDependencyArrows(data) {
     });
 }
 
+function getFilteredDataForArrows() {
+    if (!jsonData || !jsonData.items) { 
+        return { items: [], buckets: (jsonData ? jsonData.buckets : []), link_base: (jsonData ? jsonData.link_base : null) };
+    }
+
+    let itemsToConsider = jsonData.items;
+
+    // Apply Filter B (Focus)
+    if (focusTagState.enabled && focusTagState.selectedTag) {
+        itemsToConsider = itemsToConsider.filter(item => 
+            item.extractedTags && item.extractedTags.includes(focusTagState.selectedTag)
+        );
+    }
+
+    // Apply Filter A (Visibility)
+    const currentlyDisplayedItems = itemsToConsider.filter(item => {
+        if (!item.extractedTags || item.extractedTags.length === 0) {
+            return true; // Show items with no tags
+        }
+        // Show if ANY tag on the item is set to 'show' in tagVisibilityState
+        return item.extractedTags.some(tag => tagVisibilityState[tag] === 'show');
+    });
+
+    return {
+        ...jsonData, // Keep other jsonData properties like buckets, link_base
+        items: currentlyDisplayedItems
+    };
+}
+
 function refreshDisplayAndData() {
     if (!jsonData) return;
 
-    // 1. Update JSON in textarea
+    // 1. Update JSON in textarea (always shows full, unfiltered data)
     jsonDisplay.value = JSON.stringify(jsonData, null, 4);
 
-    // 2. Re-render swimlanes
+    // 2. Re-render swimlanes (will use activeTagFilters internally)
     renderSwimlanes(jsonData);
 
-    // 3. Re-draw arrows (with delay for DOM update)
-    requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-            drawDependencyArrows(jsonData);
-        });
-    });
+    // 3. Re-draw arrows (renderSwimlanes now calls this with filtered data)
+    // requestAnimationFrame(() => {
+    //     requestAnimationFrame(() => {
+    //         // drawDependencyArrows(jsonData); // This was problematic, renderSwimlanes handles it
+    //     });
+    // });
     
-    // 4. (Re)-populate bucket selector in modal (in case buckets changed, though not implemented yet)
+    // 4. (Re)-populate bucket selector in modal
     populateBucketSelector();
+    // 5. (Re)-render filter UI (in case tags changed, though not implemented dynamically for now)
+    // renderFilterUI(); // Potentially call if tags could change dynamically
 }
 
 function populateBucketSelector() {
@@ -428,6 +576,7 @@ function deleteItem(id) {
             });
 
             refreshDisplayAndData();
+            rebuildAllUniqueTagsAndRefreshFilters();
         } else {
             alert('Item not found for deletion.');
         }
@@ -513,6 +662,8 @@ itemForm.addEventListener('submit', function(event) {
         delete newItemData.predecessor; // Ensure no empty predecessor array/value
     }
 
+    newItemData.extractedTags = extractTagsFromString(newItemData.name);
+
     const existingItemIndex = itemIdInput.value ? jsonData.items.findIndex(item => item.id === id) : -1;
 
     if (existingItemIndex > -1) {
@@ -525,6 +676,7 @@ itemForm.addEventListener('submit', function(event) {
 
     closeModal();
     refreshDisplayAndData();
+    rebuildAllUniqueTagsAndRefreshFilters();
 });
 
 // --- Bucket Management Functions ---
@@ -564,6 +716,7 @@ function deleteBucket(bucketName) {
         });
 
         refreshDisplayAndData();
+        rebuildAllUniqueTagsAndRefreshFilters();
     } else {
         alert('Bucket not found for deletion.');
     }
@@ -596,6 +749,7 @@ bucketForm.addEventListener('submit', function(event) {
     jsonData.buckets.push({ name, description });
     closeBucketModal();
     refreshDisplayAndData();
+    rebuildAllUniqueTagsAndRefreshFilters();
 });
 
 // JSON Display Toggle Functionality
@@ -609,5 +763,450 @@ if (jsonDisplayToggle && jsonDisplay && jsonToggleIndicator) {
             jsonToggleIndicator.textContent = '(Hide)';
             localStorage.setItem('jsonDisplayCollapsed', 'false');
         }
+        requestAnimationFrame(() => {
+            if (jsonData && typeof getFilteredDataForArrows === 'function') {
+                drawDependencyArrows(getFilteredDataForArrows());
+            }
+        });
     });
-} 
+}
+
+// Analytics Display Toggle Functionality
+if (analyticsToggle && analyticsContent && analyticsToggleIndicator) {
+    analyticsToggle.addEventListener('click', () => {
+        const isCollapsed = analyticsContent.classList.toggle('collapsed');
+        if (isCollapsed) {
+            analyticsToggleIndicator.textContent = '(Show)';
+            localStorage.setItem('analyticsCollapsed', 'true');
+        } else {
+            analyticsToggleIndicator.textContent = '(Hide)';
+            localStorage.setItem('analyticsCollapsed', 'false');
+        }
+        requestAnimationFrame(() => {
+             if (jsonData && typeof getFilteredDataForArrows === 'function') {
+                 drawDependencyArrows(getFilteredDataForArrows());
+            }
+        });
+    });
+}
+
+// --- Drag and Drop Handlers ---
+function handleDragStart(event, itemId) {
+    event.dataTransfer.setData('text/plain', itemId.toString());
+    event.dataTransfer.effectAllowed = 'move';
+    // Add a class to the dragged element for visual feedback
+    event.target.classList.add('dragging');
+}
+
+function handleDragEnd(event) {
+    // Remove the dragging class when drag operation ends (successfully or not)
+    event.target.classList.remove('dragging');
+    // Clear any lingering drag-over styles from targets
+    document.querySelectorAll('.drag-over-target').forEach(el => el.classList.remove('drag-over-target'));
+}
+
+function handleDragOver(event) {
+    event.preventDefault(); // Necessary to allow dropping
+    event.dataTransfer.dropEffect = 'move';
+    // Add a class to the potential drop target for visual feedback
+    const targetSwimlane = event.currentTarget;
+    if (targetSwimlane.classList.contains('swimlane')) { // Ensure it's a swimlane
+        targetSwimlane.classList.add('drag-over-target');
+    }
+}
+
+function handleDragLeave(event) {
+    // Remove the visual feedback class when item is dragged out
+    const targetSwimlane = event.currentTarget;
+    if (targetSwimlane.classList.contains('swimlane')) {
+        targetSwimlane.classList.remove('drag-over-target');
+    }
+}
+
+function handleDrop(event, targetBucketName) {
+    event.preventDefault();
+    const droppedItemId = parseInt(event.dataTransfer.getData('text/plain'));
+    
+    const swimlaneElement = event.currentTarget; // This is the swimlane div
+    swimlaneElement.classList.remove('drag-over-target');
+
+    if (!jsonData || !jsonData.items || isNaN(droppedItemId)) {
+        return;
+    }
+
+    const draggedItemOriginalIndex = jsonData.items.findIndex(item => item.id === droppedItemId);
+    if (draggedItemOriginalIndex === -1) {
+        return; // Item not found
+    }
+
+    // Retrieve and remove the item from its original position
+    const [draggedItemObject] = jsonData.items.splice(draggedItemOriginalIndex, 1);
+    
+    // Update its bucket property
+    draggedItemObject.bucket = targetBucketName;
+
+    let insertAtIndex = -1;
+
+    // Determine the reference item card, if any, under the drop point
+    const directTargetElement = document.elementFromPoint(event.clientX, event.clientY);
+    let referenceItemCard = null;
+    if (directTargetElement) {
+        referenceItemCard = directTargetElement.closest('.itemCard');
+    }
+
+    if (referenceItemCard && parseInt(referenceItemCard.dataset.id) !== draggedItemObject.id) {
+        // Dropped onto a different item card
+        const referenceItemId = parseInt(referenceItemCard.dataset.id);
+        // Find the index of this reference item in the *current* (modified) jsonData.items array
+        const referenceItemNewIndex = jsonData.items.findIndex(item => item.id === referenceItemId);
+
+        if (referenceItemNewIndex !== -1) {
+            const rect = referenceItemCard.getBoundingClientRect();
+            if (event.clientY < rect.top + rect.height / 2) {
+                // Drop occurred in the top half of the reference item card -> insert before
+                insertAtIndex = referenceItemNewIndex;
+            } else {
+                // Drop occurred in the bottom half -> insert after
+                insertAtIndex = referenceItemNewIndex + 1;
+            }
+        }
+    }
+
+    if (insertAtIndex !== -1) {
+        jsonData.items.splice(insertAtIndex, 0, draggedItemObject);
+    } else {
+        // Dropped on swimlane background, on the item itself, or other edge case.
+        // Attempt to append to the items of the target bucket logically.
+        let lastIndexOfTargetBucketInCurrentArray = -1;
+        for (let i = jsonData.items.length - 1; i >= 0; i--) {
+            if (jsonData.items[i].bucket === targetBucketName) {
+                lastIndexOfTargetBucketInCurrentArray = i;
+                break;
+            }
+        }
+
+        if (lastIndexOfTargetBucketInCurrentArray !== -1) {
+            // Insert after the last known item of this bucket in the current array
+            jsonData.items.splice(lastIndexOfTargetBucketInCurrentArray + 1, 0, draggedItemObject);
+        } else {
+            // Target bucket has no items in the current array (could be first item for this bucket)
+            // or if it was the only item and moved to a different bucket.
+            // Fallback: append to the very end of the main items list.
+            jsonData.items.push(draggedItemObject);
+        }
+    }
+    
+    refreshDisplayAndData();
+    rebuildAllUniqueTagsAndRefreshFilters();
+}
+
+function renderFilterUI() {
+    if (!filterContainer) return; // filterContainer is for Filter A
+    const focusFilterContainer = document.getElementById('focusFilterContainer');
+    if (!focusFilterContainer) return;
+
+    filterContainer.innerHTML = ''; // Clear existing Filter A
+    focusFilterContainer.innerHTML = ''; // Clear existing Filter B
+
+    if (allUniqueTags.size === 0) {
+        filterContainer.innerHTML = '<span class="no-tags-message">No tags found for Filter A.</span>';
+        focusFilterContainer.innerHTML = '<span class="no-tags-message">No tags for Focus Filter.</span>';
+        return;
+    }
+
+    // --- Render Filter A: Show/Hide per tag ---
+    const filterATitle = document.createElement('h3');
+    filterATitle.textContent = 'Tag Visibility (Filter A):';
+    filterContainer.appendChild(filterATitle);
+
+    allUniqueTags.forEach(tag => {
+        // Initialize state if not present (default to 'show')
+        if (tagVisibilityState[tag] === undefined) {
+            tagVisibilityState[tag] = 'show';
+        }
+
+        const tagGroup = document.createElement('div');
+        tagGroup.className = 'filter-tag-group';
+        tagGroup.textContent = `${tag}: `;
+
+        const showRadioId = `filter-tag-${tag}-show`;
+        const showLabel = document.createElement('label');
+        showLabel.htmlFor = showRadioId;
+        showLabel.className = 'filter-tag-radio-label';
+        const showRadio = document.createElement('input');
+        showRadio.type = 'radio';
+        showRadio.id = showRadioId;
+        showRadio.name = `filter-tag-${tag}`;
+        showRadio.value = 'show';
+        showRadio.checked = tagVisibilityState[tag] === 'show';
+        showRadio.addEventListener('change', () => {
+            tagVisibilityState[tag] = 'show';
+            refreshDisplayAndData();
+        });
+        showLabel.appendChild(showRadio);
+        showLabel.appendChild(document.createTextNode('Show'));
+        tagGroup.appendChild(showLabel);
+
+        const hideRadioId = `filter-tag-${tag}-hide`;
+        const hideLabel = document.createElement('label');
+        hideLabel.htmlFor = hideRadioId;
+        hideLabel.className = 'filter-tag-radio-label';
+        const hideRadio = document.createElement('input');
+        hideRadio.type = 'radio';
+        hideRadio.id = hideRadioId;
+        hideRadio.name = `filter-tag-${tag}`;
+        hideRadio.value = 'hide';
+        hideRadio.checked = tagVisibilityState[tag] === 'hide';
+        hideRadio.addEventListener('change', () => {
+            tagVisibilityState[tag] = 'hide';
+            refreshDisplayAndData();
+        });
+        hideLabel.appendChild(hideRadio);
+        hideLabel.appendChild(document.createTextNode('Hide'));
+        tagGroup.appendChild(hideLabel);
+        
+        filterContainer.appendChild(tagGroup);
+    });
+
+    // --- Render Filter B: Focus on Tag ---
+    const filterBTitle = document.createElement('h3');
+    filterBTitle.textContent = 'Focus (Filter B):';
+    focusFilterContainer.appendChild(filterBTitle);
+
+    const focusCheckboxLabel = document.createElement('label');
+    focusCheckboxLabel.className = 'filter-tag-label';
+    const focusCheckbox = document.createElement('input');
+    focusCheckbox.type = 'checkbox';
+    focusCheckbox.id = 'focus-tag-enabled';
+    focusCheckbox.checked = focusTagState.enabled;
+    focusCheckbox.addEventListener('change', (event) => {
+        focusTagState.enabled = event.target.checked;
+        refreshDisplayAndData();
+    });
+    focusCheckboxLabel.appendChild(focusCheckbox);
+    focusCheckboxLabel.appendChild(document.createTextNode(' Focus on Tag: '));
+    focusFilterContainer.appendChild(focusCheckboxLabel);
+
+    const focusSelect = document.createElement('select');
+    focusSelect.id = 'focus-tag-select';
+    focusSelect.disabled = !focusTagState.enabled; // Disable if checkbox is not checked
+
+    // Add a default/placeholder option if needed, or select the first tag
+    const defaultOption = document.createElement('option');
+    defaultOption.value = ''; // or some placeholder value
+    defaultOption.textContent = '-- Select Tag --';
+    focusSelect.appendChild(defaultOption);
+
+    allUniqueTags.forEach(tag => {
+        const option = document.createElement('option');
+        option.value = tag;
+        option.textContent = tag;
+        if (focusTagState.selectedTag === tag) {
+            option.selected = true;
+        }
+        focusSelect.appendChild(option);
+    });
+    focusSelect.addEventListener('change', (event) => {
+        focusTagState.selectedTag = event.target.value;
+        refreshDisplayAndData();
+    });
+    focusFilterContainer.appendChild(focusSelect);
+    
+    // Re-enable/disable select based on checkbox state (also on initial render)
+    focusCheckbox.addEventListener('change', (event) => {
+        focusTagState.enabled = event.target.checked;
+        focusSelect.disabled = !event.target.checked;
+        if (!event.target.checked) { // If disabling focus, clear selected tag state
+            focusTagState.selectedTag = null;
+            focusSelect.value = ''; // Reset dropdown to placeholder
+        }
+        refreshDisplayAndData();
+    });
+
+}
+
+function calculateAndRenderAnalytics() {
+    if (!jsonData || !jsonData.items) {
+        analyticsContent.innerHTML = '<p>No data loaded for analytics.</p>';
+        return;
+    }
+
+    const effortsByTag = {};
+    const grandTotals = { design: 0, build: 0, test: 0, total: 0, itemCount: 0 };
+    const statusOrder = ['new', 'in_progress', 'on_hold', 'completed']; // Define status order for rendering
+    const statusColors = {
+        'new': '#f8f9fa', // Default item card background, subtle enough for a row
+        'in_progress': '#e6f7ff', // Light blue from .item-status-in_progress
+        'on_hold': '#fffbe6',     // Light yellow from .item-status-on_hold
+        'completed': '#f6ffed'   // Light green from .item-status-completed
+    };
+
+    // Use the original, unfiltered jsonData.items for analytics
+    jsonData.items.forEach(item => {
+        const design = parseFloat(item.design_effort || 0);
+        const build = parseFloat(item.build_effort || 0);
+        const test = parseFloat(item.test_effort || 0);
+        item.total_effort = design + build + test; // Store total on item for display on card
+
+        grandTotals.design += design;
+        grandTotals.build += build;
+        grandTotals.test += test;
+        grandTotals.total += item.total_effort;
+        grandTotals.itemCount++;
+
+        const itemStatus = (item.status || 'new').toLowerCase().replace(/\s+/g, '_');
+
+        (item.extractedTags || []).forEach(tag => {
+            if (!effortsByTag[tag]) {
+                effortsByTag[tag] = {
+                    statuses: {},
+                    subTotals: { design: 0, build: 0, test: 0, total: 0, itemCount: 0 }
+                };
+            }
+
+            // Initialize status object for the tag if it doesn't exist
+            if (!effortsByTag[tag].statuses[itemStatus]) {
+                effortsByTag[tag].statuses[itemStatus] = { design: 0, build: 0, test: 0, total: 0, itemCount: 0 };
+            }
+
+            // Add to specific status
+            effortsByTag[tag].statuses[itemStatus].design += design;
+            effortsByTag[tag].statuses[itemStatus].build += build;
+            effortsByTag[tag].statuses[itemStatus].test += test;
+            effortsByTag[tag].statuses[itemStatus].total += item.total_effort;
+            effortsByTag[tag].statuses[itemStatus].itemCount++;
+
+            // Add to tag's subtotal
+            effortsByTag[tag].subTotals.design += design;
+            effortsByTag[tag].subTotals.build += build;
+            effortsByTag[tag].subTotals.test += test;
+            effortsByTag[tag].subTotals.total += item.total_effort;
+            effortsByTag[tag].subTotals.itemCount++; // This will count unique items per tag correctly
+        });
+    });
+
+    let tableHTML = `
+        <table>
+            <thead>
+                <tr>
+                    <th>Tag / Status</th>
+                    <th>Items</th>
+                    <th>Design Effort</th>
+                    <th>Build Effort</th>
+                    <th>Test Effort</th>
+                    <th>Total Effort</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    const sortedTags = Object.keys(effortsByTag).sort();
+
+    sortedTags.forEach(tag => {
+        const tagData = effortsByTag[tag];
+        tableHTML += `
+            <tr class="tag-group-header">
+                <td colspan="6"><strong>Tag: ${tag}</strong></td>
+            </tr>
+        `;
+
+        statusOrder.forEach(statusKey => {
+            const statusData = tagData.statuses[statusKey];
+            const displayStatus = statusKey.charAt(0).toUpperCase() + statusKey.slice(1).replace(/_/g, ' ');
+            const bgColor = statusColors[statusKey] || '#ffffff'; // Fallback to white if status not in map
+
+            if (statusData && statusData.itemCount > 0) {
+                tableHTML += `
+                    <tr class="status-row" style="background-color: ${bgColor};">
+                        <td style="padding-left: 25px;">${displayStatus}</td>
+                        <td class="effort-value">${statusData.itemCount}</td>
+                        <td class="effort-value">${statusData.design.toFixed(1)}</td>
+                        <td class="effort-value">${statusData.build.toFixed(1)}</td>
+                        <td class="effort-value">${statusData.test.toFixed(1)}</td>
+                        <td class="effort-value"><strong>${statusData.total.toFixed(1)}</strong></td>
+                    </tr>
+                `;
+            } else {
+                // Render row with 0s if no items for this status under this tag
+                tableHTML += `
+                    <tr class="status-row zero-value-row" style="background-color: ${bgColor};">
+                        <td style="padding-left: 25px;">${displayStatus}</td>
+                        <td class="effort-value">0</td>
+                        <td class="effort-value">0.0</td>
+                        <td class="effort-value">0.0</td>
+                        <td class="effort-value">0.0</td>
+                        <td class="effort-value"><strong>0.0</strong></td>
+                    </tr>
+                `;
+            }
+        });
+        
+        // Tag Sub-total Row
+        tableHTML += `
+            <tr class="tag-subtotal-row">
+                <td style="padding-left: 15px;"><em>Subtotal for ${tag}</em></td>
+                <td class="effort-value"><em>${tagData.subTotals.itemCount}</em></td>
+                <td class="effort-value"><em>${tagData.subTotals.design.toFixed(1)}</em></td>
+                <td class="effort-value"><em>${tagData.subTotals.build.toFixed(1)}</em></td>
+                <td class="effort-value"><em>${tagData.subTotals.test.toFixed(1)}</em></td>
+                <td class="effort-value"><strong><em>${tagData.subTotals.total.toFixed(1)}</em></strong></td>
+            </tr>
+        `;
+    });
+
+    tableHTML += `
+            </tbody>
+            <tfoot>
+                <tr class="total-row">
+                    <td><strong>Grand Total (All Items)</strong></td>
+                    <td class="effort-value"><strong>${grandTotals.itemCount}</strong></td>
+                    <td class="effort-value"><strong>${grandTotals.design.toFixed(1)}</strong></td>
+                    <td class="effort-value"><strong>${grandTotals.build.toFixed(1)}</strong></td>
+                    <td class="effort-value"><strong>${grandTotals.test.toFixed(1)}</strong></td>
+                    <td class="effort-value"><strong>${grandTotals.total.toFixed(1)}</strong></td>
+                </tr>
+            </tfoot>
+        </table>
+    `;
+
+    analyticsContent.innerHTML = tableHTML;
+}
+
+function rebuildAllUniqueTagsAndRefreshFilters() {
+    if (!jsonData || !jsonData.items) return;
+
+    allUniqueTags.clear();
+    jsonData.items.forEach(item => {
+        // Ensure all items have their tags extracted/updated if they exist
+        // This is especially important if an item was just added/modified
+        if (item.name) { // Check if item.name exists before trying to extract tags
+             item.extractedTags = extractTagsFromString(item.name);
+             item.extractedTags.forEach(tag => allUniqueTags.add(tag));
+        } else {
+            item.extractedTags = []; // Ensure it's an empty array if no name
+        }
+    });
+    // After rebuilding allUniqueTags, we also need to ensure tagVisibilityState is up-to-date
+    // Remove any tags from tagVisibilityState that are no longer in allUniqueTags
+    Object.keys(tagVisibilityState).forEach(tagInState => {
+        if (!allUniqueTags.has(tagInState)) {
+            delete tagVisibilityState[tagInState];
+        }
+    });
+    // Add any new unique tags to tagVisibilityState, defaulting to 'show'
+    allUniqueTags.forEach(tag => {
+        if (tagVisibilityState[tag] === undefined) {
+            tagVisibilityState[tag] = 'show';
+        }
+    });
+
+
+    renderFilterUI(); // Re-render the filter controls
+}
+
+// Ensure filterContainer is assigned after DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    filterContainer = document.getElementById('filterTagsContainer');
+    // Any initial rendering that depends on filterContainer being present can go here
+    // or be triggered after file load, which is current behavior.
+}); 

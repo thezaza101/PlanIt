@@ -9,9 +9,23 @@
 <body>
     <h1>Local JSON File Reader/Editor</h1>
 
-    <div class="controls">
-        <label for="fileInput">Select JSON File:</label>
-        <input type="file" id="fileInput" accept=".json">
+    <div class="main-controls-container">
+        <div class="control-group">
+            <label for="fileInput">Select JSON File:</label>
+            <input type="file" id="fileInput" accept=".json">
+        </div>
+        <div class="control-group">
+            <button id="saveButton">Save/Download JSON</button>
+        </div>
+        <div class="control-group">
+            <button id="addBucketButton">+ Add New Bucket</button>
+        </div>
+        <div id="filterTagsContainer" class="control-group filter-group">
+            <!-- Filters will be rendered here by JavaScript -->
+        </div>
+        <div id="focusFilterContainer" class="control-group filter-group">
+            <!-- Focus filter (Filter B) will be rendered here -->
+        </div>
     </div>
 
     <div id="jsonDisplayContainer">
@@ -19,18 +33,19 @@
         <textarea id="jsonDisplay" placeholder="JSON content will appear here..."></textarea>
     </div>
 
-    <div class="controls" style="margin-top: 20px; margin-bottom: 0px; justify-content: flex-start;">
-        <button id="addBucketButton">+ Add New Bucket</button>
+    <!-- Analytics Section -->
+    <div id="analyticsSection">
+        <h2 id="analyticsToggle">Analytics <span id="analyticsToggleIndicator">(Show)</span></h2>
+        <div id="analyticsContent" class="collapsed">
+            <!-- Analytics data will be rendered here by JavaScript -->
+        </div>
     </div>
+    <!-- End Analytics Section -->
 
     <div id="swimlaneContainerWrapper">
         <h2>Visual Plan</h2>
         <div id="swimlaneContainer"></div>
         <svg id="arrowCanvas"></svg>
-    </div>
-
-    <div class="controls">
-        <button id="saveButton">Save/Download JSON</button>
     </div>
 
     <!-- Item Add/Edit Modal -->

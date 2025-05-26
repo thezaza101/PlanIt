@@ -40,6 +40,98 @@ body {
     gap: 8px;
 }
 
+.filter-group {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    background-color: #f8f9fa;
+}
+
+.filter-group h3 {
+    margin: 0 10px 0 0;
+    font-size: 1em;
+    font-weight: 600;
+    color: #343a40;
+}
+
+.filter-tag-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.9em;
+    color: #495057;
+    cursor: pointer;
+    padding: 3px 0;
+}
+
+.filter-tag-label input[type="checkbox"] {
+    margin: 0;
+    width: auto; /* Override general button/input style */
+    padding: 0; /* Override general button/input style */
+}
+
+/* Styles for Filter A and B components */
+.filter-tag-group {
+    display: block; /* Each tag on a new line for Filter A radio groups */
+    margin-bottom: 8px;
+    padding: 8px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    background-color: #fff; /* Add a slight background to each group */
+    font-size: 0.9em;
+    line-height: 1.5;
+}
+
+.filter-tag-group label.filter-tag-radio-label {
+    margin-right: 12px;
+    font-weight: normal; 
+    cursor: pointer;
+}
+
+.filter-tag-group input[type="radio"] {
+    margin-right: 4px;
+    vertical-align: middle;
+    width: auto; 
+    padding: 0;
+}
+
+#focusFilterContainer {
+    /* Uses .filter-group for general layout */
+}
+
+#focusFilterContainer label.filter-tag-label {
+    /* Styles already defined by general .filter-tag-label */
+}
+
+#focusFilterContainer input[type="checkbox"] {
+    vertical-align: middle;
+}
+
+#focusFilterContainer select {
+    padding: 6px 8px;
+    border-radius: 4px;
+    border: 1px solid #ced4da;
+    margin-left: 8px;
+    font-size: 0.9em;
+    background-color: #fff;
+    line-height: 1.3;
+}
+
+#focusFilterContainer select:disabled {
+    background-color: #e9ecef;
+    cursor: not-allowed;
+}
+
+.no-tags-message {
+    font-style: italic;
+    color: #6c757d;
+    font-size: 0.9em;
+}
+
 /* JSON Display Area - De-emphasized */
 #jsonDisplayContainer {
     width: auto; /* Let it be controlled by its parent or defaults */
@@ -78,6 +170,101 @@ body {
 
 #jsonDisplay.collapsed {
     display: none;
+}
+
+/* Analytics Section */
+#analyticsSection {
+    padding: 10px 25px;
+    background-color: #f0f4f7; /* Slightly different background */
+    border-bottom: 1px solid #dce3e9;
+}
+
+#analyticsToggle {
+    cursor: pointer;
+    font-size: 1.1em;
+    margin-bottom: 8px;
+    color: #495057;
+    user-select: none;
+    font-weight: 500;
+}
+
+#analyticsToggle #analyticsToggleIndicator {
+    font-size: 0.8em;
+    color: #007bff;
+    font-weight: normal;
+}
+
+#analyticsContent {
+    padding: 15px;
+    border: 1px solid #dce3e9;
+    border-radius: 4px;
+    background-color: #fff;
+}
+
+#analyticsContent.collapsed {
+    display: none;
+}
+
+#analyticsContent table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+}
+
+#analyticsContent th, #analyticsContent td {
+    border: 1px solid #dee2e6;
+    padding: 8px 12px;
+    text-align: left;
+    font-size: 0.9em;
+}
+
+#analyticsContent th {
+    background-color: #e9ecef;
+    font-weight: 600;
+    color: #343a40;
+}
+
+#analyticsContent td.effort-value {
+    text-align: right;
+}
+
+#analyticsContent .total-row td {
+    font-weight: bold;
+    background-color: #f8f9fa;
+}
+
+#analyticsContent .tag-group-header td {
+    background-color: #e2e6ea; /* Slightly darker than normal header */
+    font-weight: bold;
+    color: #212529;
+    padding-top: 10px;
+    padding-bottom: 10px;
+}
+
+#analyticsContent .status-row td:first-child {
+    /* padding-left is set inline in JS, can be moved here if preferred */
+}
+
+#analyticsContent .tag-subtotal-row td {
+    background-color: #f8f9fa; /* Same as grand total for consistency */
+    font-style: italic;
+    color: #495057;
+}
+
+#analyticsContent .tag-subtotal-row td:first-child {
+    /* padding-left is set inline in JS */
+}
+
+#analyticsContent .tag-subtotal-row strong {
+    color: #343a40; /* Ensure subtotal effort values are clearly bold */
+}
+
+#analyticsContent .status-row.zero-value-row td {
+    color: #777; /* Dim the text for rows with zero values */
+}
+
+#analyticsContent .status-row.zero-value-row strong {
+    color: #777; /* Also dim the bolded zero total */
 }
 
 /* Visual Plan - Main Focus */
@@ -222,6 +409,19 @@ label { /* From original full set, ensure it's present if it was global */
 .itemCard:hover {
     transform: translateY(-2px);
     box-shadow: 0 3px 6px rgba(0,0,0,0.08);
+}
+
+/* Drag and Drop Visuals */
+.itemCard.dragging {
+    opacity: 0.5;
+    border: 2px dashed #007bff;
+    transform: scale(0.95); /* Slightly shrink while dragging */
+}
+
+.swimlane.drag-over-target {
+    background-color: #d6eaff; /* Light blue highlight for drop target */
+    border-style: dashed;
+    border-color: #007bff;
 }
 
 /* Status-based styling for item cards */
