@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON Editor</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>Local JSON File Reader/Editor</h1>
+
+    <div class="controls">
+        <label for="fileInput">Select JSON File:</label>
+        <input type="file" id="fileInput" accept=".json">
+    </div>
+
+    <textarea id="jsonDisplay" placeholder="JSON content will appear here..."></textarea>
+
+    <div class="controls">
+        <button id="saveButton">Save/Download JSON</button>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const jsonDisplay = document.getElementById('jsonDisplay');
+        const saveButton = document.getElementById('saveButton');
+        let originalFileName = 'edited_data.json';
+
+        fileInput.addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                originalFileName = file.name;
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const content = e.target.result;
+                        // Attempt to parse to ensure it's valid JSON, then stringify for display
+                        const parsedJson = JSON.parse(content);
+                        jsonDisplay.value = JSON.stringify(parsedJson, null, 4); // Pretty print
+                    } catch (error) {
+                        alert('Error parsing JSON file: ' + error.message);
+                        jsonDisplay.value = "Error: Could not load or parse the JSON file. Please ensure it's a valid JSON format.";
+                    }
+                };
+                reader.onerror = function() {
+                    alert('Error reading file.');
+                    jsonDisplay.value = "Error: Could not read the file.";
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        saveButton.addEventListener('click', function() {
+            let contentToSave = jsonDisplay.value;
+            try {
+                // Validate that the content is valid JSON before saving
+                JSON.parse(contentToSave); 
+            } catch (error) {
+                alert('The content in the editor is not valid JSON. Please correct it before saving.\nError: ' + error.message);
+                return;
+            }
+
+            const blob = new Blob([contentToSave], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = originalFileName; // Suggest the original file name or a default
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+    </script>
+</body>
+</html>

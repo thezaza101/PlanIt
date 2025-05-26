@@ -1,0 +1,57 @@
+{
+    "buckets": [
+        {
+            "name": "PI44",
+            "description": "PI44"            
+        },
+        {
+            "name": "PI45",
+            "description": "PI45"
+        },
+        {
+            "name": "PI46",
+            "description": "PI46"
+        },
+        {
+            "name": "PI47",
+            "description": "PI47"
+        },
+        {
+            "name": "PI48",
+            "description": "PI48"
+        },
+        {
+            "name": "PI49",
+            "description": "PI49"
+        }            
+    ],
+    "items": [
+        {
+            "id": 16546546,
+            "name": "Create app skeleton",
+            "bucket": "PI44",
+            "description": "a lot of text..."
+        },
+        {
+            "id": 16546547,
+            "predecessor": 16546546,
+            "name": "implement basic auth",
+            "bucket": "PI45",
+            "description": "a lot of text..."
+        },
+        {
+            "id": 16546548,
+            "predecessor": 16546546,
+            "name": "setup database",
+            "bucket": "PI45",
+            "description": "a lot of text..."
+        },
+        {
+            "id": 16546549,
+            "predecessor": [16546547, 16546548],
+            "name": "user profile creation",
+            "bucket": "PI46",
+            "description": "a lot of text..."
+        }
+    ]
+}
