@@ -14,6 +14,7 @@ const itemPredecessorsInput = document.getElementById('itemPredecessors');
 const itemDesignEffortInput = document.getElementById('itemDesignEffort');
 const itemBuildEffortInput = document.getElementById('itemBuildEffort');
 const itemTestEffortInput = document.getElementById('itemTestEffort');
+const itemStatusSelect = document.getElementById('itemStatus');
 
 // JSON Display Toggle Elements
 const jsonDisplayContainer = document.getElementById('jsonDisplayContainer'); // Though not directly used in toggle, good to have if needed
@@ -155,6 +156,10 @@ function renderSwimlanes(data) {
         itemsInBucket.forEach(item => {
             const itemCardDiv = document.createElement('div');
             itemCardDiv.className = 'itemCard';
+            const statusClass = `item-status-${(item.status || 'new').replace(/\s+/g, '_').toLowerCase()}`;
+            if (item.status && item.status !== 'new') {
+                 itemCardDiv.classList.add(statusClass);
+            }
             itemCardDiv.setAttribute('data-id', item.id);
 
             const itemIdSpan = document.createElement('span');
@@ -364,6 +369,7 @@ window.onclick = function(event) {
 function openAddModal(bucketName) {
     itemForm.reset();
     itemIdInput.value = ''; // Ensure it's a new item
+    itemStatusSelect.value = 'new'; // Default status for new items
     openModal('Add New Item');
     if (bucketName) {
         itemBucketSelect.value = bucketName; // Pre-select the bucket if called from a swimlane
@@ -371,8 +377,6 @@ function openAddModal(bucketName) {
 }
 
 function openModifyModal(id) {
-    // Logic to find item by ID and populate form will go here
-    // For now, just opens the modal as a placeholder
     const item = jsonData.items.find(i => i.id === id);
     if (!item) {
         alert('Item not found!');
@@ -383,6 +387,7 @@ function openModifyModal(id) {
     itemNameInput.value = item.name || '';
     itemDescriptionInput.value = item.description || '';
     itemBucketSelect.value = item.bucket || '';
+    itemStatusSelect.value = item.status || 'new';
     itemDesignEffortInput.value = item.design_effort || '';
     itemBuildEffortInput.value = item.build_effort || '';
     itemTestEffortInput.value = item.test_effort || '';
@@ -447,6 +452,7 @@ itemForm.addEventListener('submit', function(event) {
     const name = itemNameInput.value.trim();
     const description = itemDescriptionInput.value.trim();
     const bucket = itemBucketSelect.value;
+    const status = itemStatusSelect.value;
     const designEffort = parseFloat(itemDesignEffortInput.value) || 0;
     const buildEffort = parseFloat(itemBuildEffortInput.value) || 0;
     const testEffort = parseFloat(itemTestEffortInput.value) || 0;
@@ -480,6 +486,7 @@ itemForm.addEventListener('submit', function(event) {
         name,
         description,
         bucket,
+        status,
         design_effort: designEffort,
         build_effort: buildEffort,
         test_effort: testEffort

@@ -224,6 +224,29 @@ label { /* From original full set, ensure it's present if it was global */
     box-shadow: 0 3px 6px rgba(0,0,0,0.08);
 }
 
+/* Status-based styling for item cards */
+.item-status-in_progress {
+    background-color: #e6f7ff; /* Light blue */
+    border-left: 4px solid #1890ff; /* Blue left border */
+}
+
+.item-status-on_hold {
+    background-color: #fffbe6; /* Light yellow */
+    border-left: 4px solid #faad14; /* Yellow left border */
+}
+
+.item-status-completed {
+    background-color: #f6ffed; /* Light green */
+    border-left: 4px solid #52c41a; /* Green left border */
+    /* Optionally, make completed items look more 'done' */
+    /* opacity: 0.8; */ 
+}
+.item-status-completed .itemCard h4,
+.item-status-completed .item-name-link {
+    /* text-decoration: line-through; */ /* Optional: line-through for completed items */
+    /* color: #5a6268; */ /* Dim text for completed items */
+}
+
 .itemIdDisplay {
     display: block;
     font-size: 0.7em;

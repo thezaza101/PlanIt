@@ -34,7 +34,8 @@
             "description": "a lot of text...",
             "design_effort": 2,
             "build_effort": 5,
-            "test_effort": 3
+            "test_effort": 3,
+            "status": "completed"
         },
         {
             "id": 16546547,
@@ -44,7 +45,8 @@
             "description": "a lot of text...",
             "design_effort": 3,
             "build_effort": 8,
-            "test_effort": 4
+            "test_effort": 4,
+            "status": "in_progress"
         },
         {
             "id": 16546548,
@@ -54,7 +56,8 @@
             "description": "a lot of text...",
             "design_effort": 1,
             "build_effort": 4,
-            "test_effort": 2
+            "test_effort": 2,
+            "status": "on_hold"
         },
         {
             "id": 16546549,
@@ -64,7 +67,8 @@
             "description": "a lot of text...",
             "design_effort": 4,
             "build_effort": 10,
-            "test_effort": 6
+            "test_effort": 6,
+            "status": "new"
         }
     ]
 }
