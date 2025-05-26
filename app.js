@@ -353,6 +353,7 @@ function closeModal() {
     itemModal.style.display = 'none';
     itemForm.reset(); // Clear form fields
     itemIdInput.value = ''; // Ensure hidden ID field is cleared
+    itemIdInput.readOnly = false; // Reset readOnly state
 }
 
 // Close modal if user clicks outside of it
@@ -369,6 +370,7 @@ window.onclick = function(event) {
 function openAddModal(bucketName) {
     itemForm.reset();
     itemIdInput.value = ''; // Ensure it's a new item
+    itemIdInput.readOnly = false; // Make it editable for new items
     itemStatusSelect.value = 'new'; // Default status for new items
     openModal('Add New Item');
     if (bucketName) {
@@ -384,6 +386,7 @@ function openModifyModal(id) {
     }
     openModal(`Modify Item (ID: ${id})`);
     itemIdInput.value = item.id;
+    itemIdInput.readOnly = true; // Make ID read-only for existing items
     itemNameInput.value = item.name || '';
     itemDescriptionInput.value = item.description || '';
     itemBucketSelect.value = item.bucket || '';
@@ -433,14 +436,6 @@ function deleteItem(id) {
     }
 }
 
-function generateNewId() {
-    if (!jsonData || !jsonData.items || jsonData.items.length === 0) {
-        return Date.now(); // Fallback to timestamp if no items or for the very first item
-    }
-    const maxId = jsonData.items.reduce((max, item) => Math.max(max, typeof item.id === 'number' ? item.id : 0), 0);
-    return maxId + 1;
-}
-
 itemForm.addEventListener('submit', function(event) {
     event.preventDefault();
     if (!jsonData) {
@@ -448,7 +443,27 @@ itemForm.addEventListener('submit', function(event) {
         return;
     }
 
-    const id = itemIdInput.value ? parseInt(itemIdInput.value) : generateNewId();
+    const idString = itemIdInput.value.trim();
+    if (!idString) {
+        alert('Item ID is required.');
+        return;
+    }
+    const id = parseInt(idString);
+    if (isNaN(id)) {
+        alert('Item ID must be a valid number.');
+        return;
+    }
+
+    const isNewItem = !itemIdInput.readOnly; // Check if we are adding a new item
+
+    if (isNewItem) {
+        // Check for ID uniqueness only for new items
+        if (jsonData.items.some(item => item.id === id)) {
+            alert(`An item with ID ${id} already exists. Please choose a unique ID.`);
+            return;
+        }
+    }
+
     const name = itemNameInput.value.trim();
     const description = itemDescriptionInput.value.trim();
     const bucket = itemBucketSelect.value;

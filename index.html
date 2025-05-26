@@ -39,7 +39,8 @@
             <span class="close-btn" onclick="closeModal()">&times;</span>
             <h2 id="modalTitle">Add/Edit Item</h2>
             <form id="itemForm">
-                <input type="hidden" id="itemId" name="id">
+                <label for="itemId">Item ID:</label>
+                <input type="number" id="itemId" name="id" required>
                 
                 <label for="itemName">Name:</label>
                 <input type="text" id="itemName" name="name" required>
