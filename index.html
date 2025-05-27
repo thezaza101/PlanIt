@@ -20,11 +20,23 @@
         <div class="control-group">
             <button id="addBucketButton">+ Add New Bucket</button>
         </div>
-        <div id="filterTagsContainer" class="control-group filter-group">
-            <!-- Filters will be rendered here by JavaScript -->
-        </div>
-        <div id="focusFilterContainer" class="control-group filter-group">
-            <!-- Focus filter (Filter B) will be rendered here -->
+    </div>
+
+    <!-- New Collapsible Filter Section -->
+    <div id="filtersSection">
+        <h2 id="filtersToggle">
+            Filters <span id="filtersToggleIndicator">(Hide)</span>
+        </h2>
+        <div id="allFiltersContainer">
+            <!-- The existing filter divs will go here, wrapped for consistent styling -->
+            <div class="main-controls-container" style="border-top: none; padding-top: 0; border-bottom: none; margin-bottom: -10px">
+                 <div id="filterTagsContainer" class="control-group filter-group">
+                    <!-- Filters will be rendered here by JavaScript -->
+                </div>
+                <div id="focusFilterContainer" class="control-group filter-group">
+                    <!-- Focus filter (Filter B) will be rendered here -->
+                </div>
+            </div>
         </div>
     </div>
 

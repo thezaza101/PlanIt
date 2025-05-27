@@ -17,12 +17,26 @@ const itemTestEffortInput = document.getElementById('itemTestEffort');
 const itemStatusSelect = document.getElementById('itemStatus');
 
 // Filter Elements (to be added in HTML later)
+/** @type {HTMLElement|null} Reference to the container for filter UI elements. */
 let filterContainer = null; // Will be assigned in DOMContentLoaded
+/** @type {Set<string>} Set of all unique tags extracted from item names across the loaded data. */
 let allUniqueTags = new Set();
 // let activeTagFilters = new Set(); // Old filter state - REMOVE or replace
 
-let tagVisibilityState = {}; // For Filter A: { tag1: 'show', tag2: 'hide', ... }
-let focusTagState = { enabled: false, selectedTag: null }; // For Filter B
+/** 
+ * @type {Object.<string, 'show'|'hide'>} 
+ * Stores the visibility state for each tag for Filter A. 
+ * e.g., { 'TAG1': 'show', 'TAG2': 'hide' }
+ */
+let tagVisibilityState = {};
+
+/**
+ * @typedef {object} FocusTagState
+ * @property {boolean} enabled - Whether the focus filter (Filter B) is active.
+ * @property {string|null} selectedTag - The tag currently selected for focus.
+ */
+/** @type {FocusTagState} Stores the state for the focus filter (Filter B). */
+let focusTagState = { enabled: false, selectedTag: null };
 
 // JSON Display Toggle Elements
 const jsonDisplayContainer = document.getElementById('jsonDisplayContainer'); // Though not directly used in toggle, good to have if needed
@@ -42,9 +56,33 @@ const bucketModalTitle = document.getElementById('bucketModalTitle');
 const bucketNameInput = document.getElementById('bucketNameInput');
 const bucketDescriptionInput = document.getElementById('bucketDescriptionInput');
 
+// Filter Section Toggle Elements (assuming these IDs in HTML)
+const filtersToggle = document.getElementById('filtersToggle');
+const filtersToggleIndicator = document.getElementById('filtersToggleIndicator');
+const allFiltersContainer = document.getElementById('allFiltersContainer');
+
 let originalFileName = 'edited_data.json';
+/** @type {object|null} Stores the parsed JSON data from the loaded file. */
 let jsonData = null;
 
+// Initialize Filter section display state from localStorage
+if (filtersToggle && allFiltersContainer && filtersToggleIndicator) {
+    const isFiltersCollapsed = localStorage.getItem('filtersCollapsed') !== 'false'; // Default to expanded
+    if (isFiltersCollapsed) {
+        allFiltersContainer.classList.add('collapsed');
+        filtersToggleIndicator.textContent = '(Show)';
+    } else {
+        allFiltersContainer.classList.remove('collapsed');
+        filtersToggleIndicator.textContent = '(Hide)';
+    }
+}
+
+/**
+ * Extracts tags from a string.
+ * Tags are expected to be in the format [TAG_NAME].
+ * @param {string} text - The text to extract tags from.
+ * @returns {string[]} An array of extracted tag names (without brackets).
+ */
 function extractTagsFromString(text) {
     if (!text || typeof text !== 'string') return [];
     const matches = text.match(/\[(.*?)\]/g); // Find all [TAG] occurrences
@@ -52,6 +90,11 @@ function extractTagsFromString(text) {
         return matches.map(tag => tag.substring(1, tag.length - 1)); // Remove brackets
     }
     return [];
+}
+
+function stripTagsFromName(name) {
+    if (!name || typeof name !== 'string') return '';
+    return name.replace(/\[.*?\]\s*/g, '').trim(); // Simpler regex: Remove tags and leading/trailing whitespace
 }
 
 // Initialize JSON display state from localStorage
@@ -69,6 +112,10 @@ if (jsonDisplayToggle && jsonDisplay && jsonToggleIndicator) {
 }
 
 // Initialize Analytics display state from localStorage
+/** 
+ * Initializes the display state (collapsed/expanded) of the Analytics section 
+ * based on localStorage preference.
+ */
 if (analyticsToggle && analyticsContent && analyticsToggleIndicator) {
     const isAnalyticsCollapsed = localStorage.getItem('analyticsCollapsed') !== 'false';
     if (isAnalyticsCollapsed) {
@@ -81,6 +128,10 @@ if (analyticsToggle && analyticsContent && analyticsToggleIndicator) {
     // Arrows will be drawn by initial renderSwimlanes if data loads.
 }
 
+/**
+ * Handles the file input 'change' event.
+ * Reads the selected JSON file, parses it, and triggers rendering of the UI.
+ */
 fileInput.addEventListener('change', function(event) {
     const file = event.target.files[0];
     if (file) {
@@ -127,6 +178,11 @@ fileInput.addEventListener('change', function(event) {
     }
 });
 
+/**
+ * Handles the click event for the save button.
+ * Converts the content of the JSON display textarea to a Blob and initiates a download.
+ * Validates if the content is valid JSON before attempting to save.
+ */
 saveButton.addEventListener('click', function() {
     let contentToSave = jsonDisplay.value;
     try {
@@ -148,6 +204,10 @@ saveButton.addEventListener('click', function() {
     URL.revokeObjectURL(url);
 });
 
+/**
+ * Handles the scroll event on the swimlane container.
+ * Redraws dependency arrows with a delay using requestAnimationFrame to ensure layout updates are processed.
+ */
 swimlaneContainer.addEventListener('scroll', function() {
     if (jsonData) {
         requestAnimationFrame(() => {
@@ -158,6 +218,11 @@ swimlaneContainer.addEventListener('scroll', function() {
     }
 });
 
+/**
+ * Renders the swimlanes and item cards based on the provided data and current filter states.
+ * This is a core function for displaying the visual plan.
+ * @param {object} data - The main JSON data object, expected to have `buckets` and `items` arrays.
+ */
 function renderSwimlanes(data) {
     swimlaneContainer.innerHTML = '';
     arrowCanvas.innerHTML = ''; // Clear arrows before re-rendering swimlanes
@@ -248,16 +313,40 @@ function renderSwimlanes(data) {
             }
             itemCardDiv.setAttribute('data-id', item.id);
 
-            const itemIdSpan = document.createElement('span');
-            itemIdSpan.className = 'itemIdDisplay';
-            itemIdSpan.textContent = `ID: ${item.id}`;
-            itemCardDiv.appendChild(itemIdSpan);
+            const itemHeaderInfoDiv = document.createElement('div');
+            itemHeaderInfoDiv.className = 'item-header-info';
+
+            // Render tags first, to appear on the left
+            if (item.extractedTags && item.extractedTags.length > 0) {
+                const tagsDiv = document.createElement('div');
+                tagsDiv.className = 'item-tags';
+                item.extractedTags.forEach(tag => {
+                    const tagSpan = document.createElement('span');
+                    tagSpan.className = 'tag';
+                    tagSpan.textContent = tag;
+                    tagsDiv.appendChild(tagSpan);
+                });
+                itemHeaderInfoDiv.appendChild(tagsDiv);
+            }
+
+            const itemIdElement = document.createElement('a'); // Changed to 'a' for clickability
+            itemIdElement.className = 'itemIdDisplay clickable-id'; // Added a class for styling
+            itemIdElement.textContent = `ID: ${item.id}`;
+            itemIdElement.href = '#'; // Make it behave like a link
+            itemIdElement.onclick = (e) => {
+                e.preventDefault(); // Prevent page jump
+                openModifyModal(item.id);
+            };
+            itemHeaderInfoDiv.appendChild(itemIdElement);
+            itemCardDiv.appendChild(itemHeaderInfoDiv);
 
             // Create item name (as link or plain text)
+            const displayName = stripTagsFromName(item.name); // Use stripped name for display
+            console.log(`Original: "${item.name}", Display: "${displayName}"`); // DEBUGGING
             if (data.link_base && typeof data.link_base === 'string') {
                 const itemNameLink = document.createElement('a');
                 itemNameLink.href = data.link_base.replace('{id}', item.id.toString());
-                itemNameLink.textContent = item.name || 'Unnamed Item';
+                itemNameLink.textContent = displayName || 'Unnamed Item';
                 itemNameLink.target = '_blank'; // Open in new tab
                 itemNameLink.className = 'item-name-link'; // For styling if needed
                 
@@ -267,7 +356,7 @@ function renderSwimlanes(data) {
                 itemCardDiv.appendChild(itemNameHeader);
             } else {
                 const itemName = document.createElement('h4');
-                itemName.textContent = item.name || 'Unnamed Item';
+                itemName.textContent = displayName || 'Unnamed Item';
                 itemCardDiv.appendChild(itemName);
             }
 
@@ -288,18 +377,6 @@ function renderSwimlanes(data) {
 
             const itemControlsDiv = document.createElement('div');
             itemControlsDiv.className = 'item-controls';
-
-            const modifyButton = document.createElement('button');
-            modifyButton.className = 'item-btn item-btn-modify';
-            modifyButton.textContent = 'Modify';
-            modifyButton.onclick = () => openModifyModal(item.id);
-            itemControlsDiv.appendChild(modifyButton);
-
-            const deleteButton = document.createElement('button');
-            deleteButton.className = 'item-btn item-btn-delete';
-            deleteButton.textContent = 'Delete';
-            deleteButton.onclick = () => deleteItem(item.id);
-            itemControlsDiv.appendChild(deleteButton);
 
             itemCardDiv.appendChild(itemControlsDiv);
             
@@ -322,6 +399,8 @@ function renderSwimlanes(data) {
             totalTestEffort += parseFloat(item.test_effort || 0);
         });
 
+        const grandTotalEffortInBucket = totalDesignEffort + totalBuildEffort + totalTestEffort;
+
         const effortSummaryDiv = document.createElement('div');
         effortSummaryDiv.className = 'bucket-effort-summary';
         effortSummaryDiv.innerHTML = `
@@ -330,6 +409,7 @@ function renderSwimlanes(data) {
             <span>Design: <strong>${totalDesignEffort.toFixed(1)}</strong></span>
             <span>Build: <strong>${totalBuildEffort.toFixed(1)}</strong></span>
             <span>Test: <strong>${totalTestEffort.toFixed(1)}</strong></span>
+            <span style="margin-top: 5px;">Total: <strong>${grandTotalEffortInBucket.toFixed(1)}</strong></span>
         `;
         swimlaneDiv.appendChild(effortSummaryDiv);
 
@@ -344,10 +424,52 @@ function renderSwimlanes(data) {
     });
 }
 
+/**
+ * Retrieves the data (including filtered items) that should be used for drawing dependency arrows.
+ * This function encapsulates the current filtering logic (Focus Filter B and Tag Visibility Filter A).
+ * @returns {object} An object containing all original jsonData properties but with the `items` array filtered 
+ *                   according to the current filter states. If no jsonData is loaded, returns a structure with empty items.
+ */
+function getFilteredDataForArrows() {
+    if (!jsonData || !jsonData.items) { 
+        return { items: [], buckets: (jsonData ? jsonData.buckets : []), link_base: (jsonData ? jsonData.link_base : null) };
+    }
+
+    let itemsToConsider = jsonData.items;
+
+    // Apply Filter B (Focus)
+    if (focusTagState.enabled && focusTagState.selectedTag) {
+        itemsToConsider = itemsToConsider.filter(item => 
+            item.extractedTags && item.extractedTags.includes(focusTagState.selectedTag)
+        );
+    }
+
+    // Apply Filter A (Visibility)
+    const currentlyDisplayedItems = itemsToConsider.filter(item => {
+        if (!item.extractedTags || item.extractedTags.length === 0) {
+            return true; // Show items with no tags
+        }
+        // Show if ANY tag on the item is set to 'show' in tagVisibilityState
+        return item.extractedTags.some(tag => tagVisibilityState[tag] === 'show');
+    });
+
+    return {
+        ...jsonData, // Keep other jsonData properties like buckets, link_base
+        items: currentlyDisplayedItems
+    };
+}
+
+/**
+ * Draws SVG dependency arrows between item cards on the arrowCanvas.
+ * Arrows are drawn based on the `predecessor` field in items.
+ * Calculates positions dynamically based on item card bounding rectangles.
+ * @param {object} data - The data object containing items to draw arrows for. 
+ *                      Typically, this should be the output of `getFilteredDataForArrows()`.
+ */
 function drawDependencyArrows(data) {
     arrowCanvas.innerHTML = '';
 
-    if (!data || !data.items || data.items.length === 0) { // Added check for empty items array
+    if (!data || !data.items || data.items.length === 0) { 
         return;
     }
 
@@ -403,7 +525,7 @@ function drawDependencyArrows(data) {
                         y2 = successorRect.bottom - arrowCanvasRect.top;
                     }
                 } else {
-                    // Different buckets: Draw a horizontal-ish arrow (original logic)
+                    // Different buckets: Draw a horizontal-ish arrow
                     x1 = predecessorRect.right - arrowCanvasRect.left;                       // Right-middle of predecessor
                     y1 = predecessorRect.top - arrowCanvasRect.top + predecessorRect.height / 2;
                     x2 = successorRect.left - arrowCanvasRect.left;                          // Left-middle of successor
@@ -411,7 +533,7 @@ function drawDependencyArrows(data) {
                 }
                 
                 // Prevent drawing arrow if start and end points are identical or extremely close
-                if (Math.hypot(x2 - x1, y2 - y1) < 2) { // Check if distance is less than 2px
+                if (Math.hypot(x2 - x1, y2 - y1) < 2) { 
                     return; 
                 }
 
@@ -429,35 +551,10 @@ function drawDependencyArrows(data) {
     });
 }
 
-function getFilteredDataForArrows() {
-    if (!jsonData || !jsonData.items) { 
-        return { items: [], buckets: (jsonData ? jsonData.buckets : []), link_base: (jsonData ? jsonData.link_base : null) };
-    }
-
-    let itemsToConsider = jsonData.items;
-
-    // Apply Filter B (Focus)
-    if (focusTagState.enabled && focusTagState.selectedTag) {
-        itemsToConsider = itemsToConsider.filter(item => 
-            item.extractedTags && item.extractedTags.includes(focusTagState.selectedTag)
-        );
-    }
-
-    // Apply Filter A (Visibility)
-    const currentlyDisplayedItems = itemsToConsider.filter(item => {
-        if (!item.extractedTags || item.extractedTags.length === 0) {
-            return true; // Show items with no tags
-        }
-        // Show if ANY tag on the item is set to 'show' in tagVisibilityState
-        return item.extractedTags.some(tag => tagVisibilityState[tag] === 'show');
-    });
-
-    return {
-        ...jsonData, // Keep other jsonData properties like buckets, link_base
-        items: currentlyDisplayedItems
-    };
-}
-
+/**
+ * Refreshes the entire display: updates the JSON textarea, re-renders swimlanes (which includes items and arrows),
+ * and re-populates bucket selectors in modals.
+ */
 function refreshDisplayAndData() {
     if (!jsonData) return;
 
@@ -480,6 +577,9 @@ function refreshDisplayAndData() {
     // renderFilterUI(); // Potentially call if tags could change dynamically
 }
 
+/**
+ * Populates the bucket selector dropdown in the item modal with current bucket names.
+ */
 function populateBucketSelector() {
     itemBucketSelect.innerHTML = ''; // Clear existing options
     if (jsonData && jsonData.buckets) {
@@ -492,19 +592,37 @@ function populateBucketSelector() {
     }
 }
 
+/**
+ * Opens the main item modal and sets its title.
+ * @param {string} [title='Add/Edit Item'] - The title to display on the modal.
+ */
 function openModal(title = 'Add/Edit Item') {
     modalTitle.textContent = title;
     itemModal.style.display = 'block';
 }
 
+/**
+ * Closes the main item modal, resets its form, and clears relevant input fields.
+ */
 function closeModal() {
     itemModal.style.display = 'none';
+    
+    // Remove the dynamically added delete button if it exists
+    const modalDeleteButton = document.getElementById('modalDeleteButton');
+    if (modalDeleteButton) {
+        modalDeleteButton.remove();
+    }
+
     itemForm.reset(); // Clear form fields
     itemIdInput.value = ''; // Ensure hidden ID field is cleared
     itemIdInput.readOnly = false; // Reset readOnly state
 }
 
 // Close modal if user clicks outside of it
+/**
+ * Handles window click events to close modals (item or bucket) if the click is outside the modal content.
+ * @param {MouseEvent} event - The click event.
+ */
 window.onclick = function(event) {
     if (event.target == itemModal) {
         closeModal();
@@ -514,7 +632,11 @@ window.onclick = function(event) {
     }
 }
 
-// --- Placeholder functions for CRUD --- 
+/**
+ * Opens the item modal in 'Add New Item' mode.
+ * Resets the form, ensures the ID field is editable, and pre-selects a bucket if provided.
+ * @param {string} [bucketName] - Optional. The name of the bucket to pre-select for the new item.
+ */
 function openAddModal(bucketName) {
     itemForm.reset();
     itemIdInput.value = ''; // Ensure it's a new item
@@ -526,6 +648,10 @@ function openAddModal(bucketName) {
     }
 }
 
+/**
+ * Opens the item modal in 'Modify Item' mode, populating it with the details of the specified item.
+ * @param {number} id - The ID of the item to modify.
+ */
 function openModifyModal(id) {
     const item = jsonData.items.find(i => i.id === id);
     if (!item) {
@@ -549,8 +675,31 @@ function openModifyModal(id) {
     } else {
         itemPredecessorsInput.value = '';
     }
+
+    // Add Delete button to the modal
+    const modalButtonsDiv = itemForm.querySelector('.modal-buttons');
+    if (modalButtonsDiv) {
+        const deleteButton = document.createElement('button');
+        deleteButton.type = 'button'; // Important: prevent form submission
+        deleteButton.id = 'modalDeleteButton'; // ID for easy removal
+        deleteButton.className = 'item-btn item-btn-delete'; // Reuse existing class for styling
+        deleteButton.textContent = 'Delete Item';
+        deleteButton.onclick = () => {
+            deleteItem(item.id);
+            closeModal(); // Close modal after deletion
+        };
+        // Add it before the existing buttons (e.g., Save, Cancel)
+        // If modalButtonsDiv has other children like a save button, prepend delete.
+        modalButtonsDiv.insertBefore(deleteButton, modalButtonsDiv.firstChild);
+    }
 }
 
+/**
+ * Deletes an item from `jsonData.items` after user confirmation.
+ * Also removes the deleted item's ID from any other item's predecessor list.
+ * Refreshes the display and updates filter UI afterwards.
+ * @param {number} id - The ID of the item to delete.
+ */
 function deleteItem(id) {
     if (!confirm(`Are you sure you want to delete item ID: ${id}? This will also remove it as a predecessor from other items.`)) {
         return;
@@ -585,6 +734,10 @@ function deleteItem(id) {
     }
 }
 
+/**
+ * Handles the submission of the item form (for both adding new items and modifying existing ones).
+ * Validates input, updates `jsonData.items`, and refreshes the display and filter UI.
+ */
 itemForm.addEventListener('submit', function(event) {
     event.preventDefault();
     if (!jsonData) {
@@ -680,17 +833,28 @@ itemForm.addEventListener('submit', function(event) {
 });
 
 // --- Bucket Management Functions ---
+/**
+ * Opens the bucket modal for adding a new bucket.
+ */
 function openBucketModal() {
     bucketForm.reset();
     bucketModalTitle.textContent = 'Add New Bucket';
     bucketModal.style.display = 'block';
 }
 
+/**
+ * Closes the bucket modal and resets its form.
+ */
 function closeBucketModal() {
     bucketModal.style.display = 'none';
     bucketForm.reset();
 }
 
+/**
+ * Deletes a bucket and all its associated items after user confirmation.
+ * Updates predecessor lists for remaining items and refreshes the display and filter UI.
+ * @param {string} bucketName - The name of the bucket to delete.
+ */
 function deleteBucket(bucketName) {
     if (!jsonData || !jsonData.buckets) return;
 
@@ -722,10 +886,17 @@ function deleteBucket(bucketName) {
     }
 }
 
-if (addBucketButton) { // Check if the button exists (it should)
+/**
+ * Attaches an event listener to the 'Add New Bucket' button if it exists.
+ */
+if (addBucketButton) {
     addBucketButton.addEventListener('click', openBucketModal);
 }
 
+/**
+ * Handles the submission of the bucket form (for adding new buckets).
+ * Validates input, updates `jsonData.buckets`, and refreshes the display and filter UI.
+ */
 bucketForm.addEventListener('submit', function(event) {
     event.preventDefault();
     if (!jsonData) {
@@ -753,6 +924,10 @@ bucketForm.addEventListener('submit', function(event) {
 });
 
 // JSON Display Toggle Functionality
+/**
+ * Initializes and handles the click event for toggling the JSON display area (collapse/expand).
+ * Persists the state in localStorage and redraws dependency arrows.
+ */
 if (jsonDisplayToggle && jsonDisplay && jsonToggleIndicator) {
     jsonDisplayToggle.addEventListener('click', () => {
         const isCollapsed = jsonDisplay.classList.toggle('collapsed');
@@ -772,6 +947,10 @@ if (jsonDisplayToggle && jsonDisplay && jsonToggleIndicator) {
 }
 
 // Analytics Display Toggle Functionality
+/**
+ * Initializes and handles the click event for toggling the Analytics display area (collapse/expand).
+ * Persists the state in localStorage and redraws dependency arrows.
+ */
 if (analyticsToggle && analyticsContent && analyticsToggleIndicator) {
     analyticsToggle.addEventListener('click', () => {
         const isCollapsed = analyticsContent.classList.toggle('collapsed');
@@ -790,7 +969,33 @@ if (analyticsToggle && analyticsContent && analyticsToggleIndicator) {
     });
 }
 
+// Filter Section Toggle Functionality
+if (filtersToggle && allFiltersContainer && filtersToggleIndicator) {
+    filtersToggle.addEventListener('click', () => {
+        const isCollapsed = allFiltersContainer.classList.toggle('collapsed');
+        if (isCollapsed) {
+            filtersToggleIndicator.textContent = '(Show)';
+            localStorage.setItem('filtersCollapsed', 'true');
+        } else {
+            filtersToggleIndicator.textContent = '(Hide)';
+            localStorage.setItem('filtersCollapsed', 'false');
+        }
+        // Redraw arrows as collapsing filters might change layout
+        requestAnimationFrame(() => {
+             if (jsonData && typeof getFilteredDataForArrows === 'function') {
+                 drawDependencyArrows(getFilteredDataForArrows());
+            }
+        });
+    });
+}
+
 // --- Drag and Drop Handlers ---
+/**
+ * Handles the dragstart event for an item card.
+ * Sets the data to be transferred (item ID) and visual effect.
+ * @param {DragEvent} event - The drag event.
+ * @param {number} itemId - The ID of the item being dragged.
+ */
 function handleDragStart(event, itemId) {
     event.dataTransfer.setData('text/plain', itemId.toString());
     event.dataTransfer.effectAllowed = 'move';
@@ -798,6 +1003,11 @@ function handleDragStart(event, itemId) {
     event.target.classList.add('dragging');
 }
 
+/**
+ * Handles the dragend event for an item card.
+ * Cleans up any visual styling applied during the drag operation.
+ * @param {DragEvent} event - The drag event.
+ */
 function handleDragEnd(event) {
     // Remove the dragging class when drag operation ends (successfully or not)
     event.target.classList.remove('dragging');
@@ -805,6 +1015,11 @@ function handleDragEnd(event) {
     document.querySelectorAll('.drag-over-target').forEach(el => el.classList.remove('drag-over-target'));
 }
 
+/**
+ * Handles the dragover event on a potential drop target (swimlane).
+ * Prevents default behavior to allow dropping and sets the drop effect.
+ * @param {DragEvent} event - The drag event.
+ */
 function handleDragOver(event) {
     event.preventDefault(); // Necessary to allow dropping
     event.dataTransfer.dropEffect = 'move';
@@ -815,6 +1030,11 @@ function handleDragOver(event) {
     }
 }
 
+/**
+ * Handles the dragleave event on a potential drop target.
+ * Removes visual feedback styling when the dragged item leaves the target.
+ * @param {DragEvent} event - The drag event.
+ */
 function handleDragLeave(event) {
     // Remove the visual feedback class when item is dragged out
     const targetSwimlane = event.currentTarget;
@@ -823,6 +1043,13 @@ function handleDragLeave(event) {
     }
 }
 
+/**
+ * Handles the drop event on a swimlane.
+ * Updates the dragged item's bucket and its position within `jsonData.items` based on drop location.
+ * Refreshes the display.
+ * @param {DragEvent} event - The drop event.
+ * @param {string} targetBucketName - The name of the bucket where the item was dropped.
+ */
 function handleDrop(event, targetBucketName) {
     event.preventDefault();
     const droppedItemId = parseInt(event.dataTransfer.getData('text/plain'));
@@ -900,6 +1127,11 @@ function handleDrop(event, targetBucketName) {
     rebuildAllUniqueTagsAndRefreshFilters();
 }
 
+/**
+ * Renders the filter UI controls (Filter A: Tag Visibility and Filter B: Focus Tag).
+ * Populates controls based on `allUniqueTags` and current filter states (`tagVisibilityState`, `focusTagState`).
+ * Attaches event listeners to filter controls to update state and refresh the display.
+ */
 function renderFilterUI() {
     if (!filterContainer) return; // filterContainer is for Filter A
     const focusFilterContainer = document.getElementById('focusFilterContainer');
@@ -1025,6 +1257,12 @@ function renderFilterUI() {
 
 }
 
+/**
+ * Calculates and renders the analytics table.
+ * Aggregates item efforts by tag and status, and computes grand totals.
+ * Uses the original, unfiltered `jsonData.items` for calculations.
+ * Displays the results in the #analyticsContent element.
+ */
 function calculateAndRenderAnalytics() {
     if (!jsonData || !jsonData.items) {
         analyticsContent.innerHTML = '<p>No data loaded for analytics.</p>';
@@ -1172,6 +1410,10 @@ function calculateAndRenderAnalytics() {
     analyticsContent.innerHTML = tableHTML;
 }
 
+/**
+ * Function to re-evaluate all unique tags from current items and update the filter UI and its state.
+ * This is crucial after item additions, modifications (name changes), or deletions.
+ */
 function rebuildAllUniqueTagsAndRefreshFilters() {
     if (!jsonData || !jsonData.items) return;
 
@@ -1205,6 +1447,11 @@ function rebuildAllUniqueTagsAndRefreshFilters() {
 }
 
 // Ensure filterContainer is assigned after DOM is loaded
+/**
+ *DOMContentLoaded event listener.
+ * Ensures that the `filterContainer` variable is assigned after the DOM is fully loaded.
+ * This is important as `renderFilterUI` depends on this element.
+ */
 document.addEventListener('DOMContentLoaded', () => {
     filterContainer = document.getElementById('filterTagsContainer');
     // Any initial rendering that depends on filterContainer being present can go here

@@ -447,13 +447,36 @@ label { /* From original full set, ensure it's present if it was global */
     /* color: #5a6268; */ /* Dim text for completed items */
 }
 
+.item-header-info {
+    display: flex;
+    justify-content: space-between; /* Pushes ID to right, tags to left */
+    align-items: center;
+    margin-bottom: 5px; /* Space before item name */
+}
+
+.item-tags {
+    margin-bottom: 0; /* Reset margin as it's handled by item-header-info */
+    text-align: left;
+    flex-grow: 1; /* Allow tags to take available space if ID is short */
+}
+
 .itemIdDisplay {
     display: block;
     font-size: 0.7em;
     color: #6c757d;
-    margin-bottom: 4px;
+    /* margin-bottom: 4px; Removed as it's part of flex now */
     text-align: right;
     font-weight: 500;
+    white-space: nowrap; /* Prevent ID from wrapping */
+}
+
+.clickable-id {
+    cursor: pointer;
+    color: #007bff; /* Make it look like a link */
+    text-decoration: none;
+}
+.clickable-id:hover {
+    text-decoration: underline;
 }
 
 .itemCard h4 {
@@ -713,4 +736,45 @@ label { /* From original full set, ensure it's present if it was global */
 
 .effort-inputs input[type="number"] {
     margin-bottom: 0; /* Remove default bottom margin as it's handled by the container */
+}
+
+/* Styles for item tags */
+.tag {
+    display: inline-block;
+    background-color: #6c757d; /* Muted gray background color */
+    color: white;
+    padding: 2px 6px;
+    font-size: 0.75em;
+    border-radius: 4px;
+    margin-right: 4px;
+    margin-bottom: 4px; /* For wrapping */
+}
+
+/* Styles for item predecessor display in modal - can be enhanced */
+
+/* Filter Section - Toggle and Collapse */
+#filtersSection {
+    padding: 10px 25px;
+    background-color: #f8f9fa; /* Consistent with JSON display area */
+    border-bottom: 1px solid #e0e0e0;
+}
+
+#filtersToggle {
+    cursor: pointer;
+    font-size: 1.1em;
+    margin-bottom: 8px;
+    color: #495057;
+    user-select: none;
+    font-weight: 500;
+    /* Display as block or flex if needed to contain the span properly */
+}
+
+#filtersToggle #filtersToggleIndicator {
+    font-size: 0.8em;
+    color: #007bff;
+    font-weight: normal;
+}
+
+#allFiltersContainer.collapsed {
+    display: none;
 } 
