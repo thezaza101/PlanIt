@@ -777,4 +777,48 @@ label { /* From original full set, ensure it's present if it was global */
 
 #allFiltersContainer.collapsed {
     display: none;
+}
+
+/* New styles for Filter A prefix groups */
+.filter-prefix-group {
+    border: 1px solid #ccc; /* Default border, JS will set specific color */
+    border-radius: 5px;
+    padding: 10px;
+    margin-bottom: 15px;
+    transition: background-color 0.3s ease;
+}
+
+.filter-prefix-header {
+    margin-top: 0;
+    margin-bottom: 8px;
+    font-size: 1.1em;
+    font-weight: bold;
+    padding-bottom: 5px;
+    border-bottom: 1px solid rgba(0,0,0,0.1); /* Subtle separator */
+    /* Text color will be set by JS */
+}
+
+.filter-prefix-group .filter-tag-group {
+    display: block; /* Ensure each tag within a prefix group is on a new line */
+    margin-bottom: 5px;
+    padding: 3px 0; /* Minimal padding for internal tag lines */
+    border: none; /* Remove individual borders if any were set by .filter-tag-group */
+    background-color: transparent; /* Inherit from parent */
+    /* Text color for radio button labels will be set by JS */
+}
+
+.filter-prefix-group .filter-tag-radio-label {
+    /* Adjust if needed for better alignment or appearance within colored groups */
+}
+
+.filter-tag-group label.filter-tag-radio-label {
+    margin-right: 12px;
+    font-weight: normal;
+}
+
+.filter-tag-group input[type="radio"] {
+    margin-right: 4px;
+    vertical-align: middle;
+    width: auto;
+    padding: 0;
 } 

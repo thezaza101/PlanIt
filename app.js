@@ -65,6 +65,68 @@ let originalFileName = 'edited_data.json';
 /** @type {object|null} Stores the parsed JSON data from the loaded file. */
 let jsonData = null;
 
+// Color Management for Tag Prefixes
+let tagPrefixColorMap = {};
+const availableColors = [
+    '#ADD8E6', // LightBlue
+    '#FFB6C1', // LightPink
+    '#90EE90', // LightGreen
+    '#FFDAB9', // PeachPuff
+    '#E6E6FA', // Lavender
+    '#FAFAD2', // LightGoldenrodYellow
+    '#AFEEEE', // PaleTurquoise
+    '#F0E68C', // Khaki
+    '#DDA0DD', // Plum
+    '#B0C4DE', // LightSteelBlue
+    '#FFEFD5', // PapayaWhip
+    '#D8BFD8', // Thistle
+];
+let nextColorIndex = 0;
+
+/**
+ * Parses a tag string into its prefix and value.
+ * e.g., "[APP:ELH]" becomes { prefix: "APP", value: "ELH", original: "APP:ELH" }
+ * or "[TAG]" becomes { prefix: "GENERAL", value: "TAG", original: "TAG" }
+ * @param {string} tagString - The tag string (e.g., "APP:ELH" or "FEAT").
+ * @returns {{prefix: string, value: string, original: string}}
+ */
+function getTagPrefixAndValue(tagString) {
+    const parts = tagString.split(':');
+    if (parts.length > 1) {
+        return { prefix: parts[0], value: parts.slice(1).join(':'), original: tagString };
+    }
+    return { prefix: 'GENERAL', value: tagString, original: tagString };
+}
+
+/**
+ * Assigns and retrieves a color for a given tag prefix.
+ * Uses a predefined list of available colors in a round-robin fashion.
+ * @param {string} prefix - The tag prefix.
+ * @returns {string} The hex color code.
+ */
+function getColorForTagPrefix(prefix) {
+    if (!tagPrefixColorMap[prefix]) {
+        tagPrefixColorMap[prefix] = availableColors[nextColorIndex % availableColors.length];
+        nextColorIndex++;
+    }
+    return tagPrefixColorMap[prefix];
+}
+
+/**
+ * Determines if text color should be light or dark based on background color's luminance.
+ * @param {string} bgColor - The background color in hex format (e.g., "#RRGGBB").
+ * @returns {string} "white" or "black".
+ */
+function getTextColorForBackground(bgColor) {
+    const color = bgColor.startsWith('#') ? bgColor.substring(1) : bgColor;
+    const r = parseInt(color.substring(0, 2), 16);
+    const g = parseInt(color.substring(2, 4), 16);
+    const b = parseInt(color.substring(4, 6), 16);
+    // Standard luminance calculation
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return luminance > 0.5 ? 'black' : 'white';
+}
+
 // Initialize Filter section display state from localStorage
 if (filtersToggle && allFiltersContainer && filtersToggleIndicator) {
     const isFiltersCollapsed = localStorage.getItem('filtersCollapsed') !== 'false'; // Default to expanded
@@ -324,6 +386,16 @@ function renderSwimlanes(data) {
                     const tagSpan = document.createElement('span');
                     tagSpan.className = 'tag';
                     tagSpan.textContent = tag;
+
+                    // Apply new color logic
+                    const tagParts = getTagPrefixAndValue(tag);
+                    const bgColor = getColorForTagPrefix(tagParts.prefix);
+                    tagSpan.style.backgroundColor = bgColor;
+                    tagSpan.style.color = getTextColorForBackground(bgColor);
+                    // Display prefix:value or just value if prefix is GENERAL
+                    tagSpan.textContent = tagParts.prefix === 'GENERAL' ? tagParts.value : `${tagParts.prefix}:${tagParts.value}`;
+                    tagSpan.title = tag; // Show full original tag on hover
+
                     tagsDiv.appendChild(tagSpan);
                 });
                 itemHeaderInfoDiv.appendChild(tagsDiv);
@@ -1146,61 +1218,96 @@ function renderFilterUI() {
         return;
     }
 
-    // --- Render Filter A: Show/Hide per tag ---
+    // --- Render Filter A: Show/Hide per tag, grouped by prefix ---
     const filterATitle = document.createElement('h3');
     filterATitle.textContent = 'Tag Visibility (Filter A):';
     filterContainer.appendChild(filterATitle);
 
+    const tagsByPrefix = {};
     allUniqueTags.forEach(tag => {
-        // Initialize state if not present (default to 'show')
-        if (tagVisibilityState[tag] === undefined) {
-            tagVisibilityState[tag] = 'show';
+        const { prefix, value, original } = getTagPrefixAndValue(tag);
+        if (!tagsByPrefix[prefix]) {
+            tagsByPrefix[prefix] = [];
         }
-
-        const tagGroup = document.createElement('div');
-        tagGroup.className = 'filter-tag-group';
-        tagGroup.textContent = `${tag}: `;
-
-        const showRadioId = `filter-tag-${tag}-show`;
-        const showLabel = document.createElement('label');
-        showLabel.htmlFor = showRadioId;
-        showLabel.className = 'filter-tag-radio-label';
-        const showRadio = document.createElement('input');
-        showRadio.type = 'radio';
-        showRadio.id = showRadioId;
-        showRadio.name = `filter-tag-${tag}`;
-        showRadio.value = 'show';
-        showRadio.checked = tagVisibilityState[tag] === 'show';
-        showRadio.addEventListener('change', () => {
-            tagVisibilityState[tag] = 'show';
-            refreshDisplayAndData();
-        });
-        showLabel.appendChild(showRadio);
-        showLabel.appendChild(document.createTextNode('Show'));
-        tagGroup.appendChild(showLabel);
-
-        const hideRadioId = `filter-tag-${tag}-hide`;
-        const hideLabel = document.createElement('label');
-        hideLabel.htmlFor = hideRadioId;
-        hideLabel.className = 'filter-tag-radio-label';
-        const hideRadio = document.createElement('input');
-        hideRadio.type = 'radio';
-        hideRadio.id = hideRadioId;
-        hideRadio.name = `filter-tag-${tag}`;
-        hideRadio.value = 'hide';
-        hideRadio.checked = tagVisibilityState[tag] === 'hide';
-        hideRadio.addEventListener('change', () => {
-            tagVisibilityState[tag] = 'hide';
-            refreshDisplayAndData();
-        });
-        hideLabel.appendChild(hideRadio);
-        hideLabel.appendChild(document.createTextNode('Hide'));
-        tagGroup.appendChild(hideLabel);
-        
-        filterContainer.appendChild(tagGroup);
+        tagsByPrefix[prefix].push({ value, original, fullTag: tag }); // Store original tag and full tag
     });
 
-    // --- Render Filter B: Focus on Tag ---
+    // Sort prefixes alphabetically, except for GENERAL which can be last or first
+    const sortedPrefixes = Object.keys(tagsByPrefix).sort((a, b) => {
+        if (a === 'GENERAL') return 1; // Push GENERAL to the end
+        if (b === 'GENERAL') return -1;
+        return a.localeCompare(b);
+    });
+
+    sortedPrefixes.forEach(prefix => {
+        const prefixGroupContainer = document.createElement('div');
+        prefixGroupContainer.className = 'filter-prefix-group';
+        const bgColor = getColorForTagPrefix(prefix);
+        prefixGroupContainer.style.backgroundColor = bgColor;
+        prefixGroupContainer.style.borderColor = getTextColorForBackground(bgColor); // Border color for contrast
+
+        const prefixHeader = document.createElement('h4');
+        prefixHeader.className = 'filter-prefix-header';
+        prefixHeader.textContent = prefix;
+        prefixHeader.style.color = getTextColorForBackground(bgColor);
+        prefixGroupContainer.appendChild(prefixHeader);
+
+        tagsByPrefix[prefix].sort((a,b) => a.value.localeCompare(b.value)).forEach(tagInfo => {
+            const fullTag = tagInfo.fullTag; // Use the full tag for state management
+            // Initialize state if not present (default to 'show')
+            if (tagVisibilityState[fullTag] === undefined) {
+                tagVisibilityState[fullTag] = 'show';
+            }
+
+            const tagGroup = document.createElement('div');
+            tagGroup.className = 'filter-tag-group'; // Use existing class if suitable, or new one
+            tagGroup.style.color = getTextColorForBackground(bgColor); // Text color for radio labels
+
+            const displayedTagValue = prefix === 'GENERAL' ? tagInfo.value : `${prefix}:${tagInfo.value}`;
+            tagGroup.appendChild(document.createTextNode(`${tagInfo.value}: `)); // Display only the value part or full for GENERAL
+
+            const showRadioId = `filter-tag-${fullTag.replace(/[^a-zA-Z0-9]/g, '_')}-show`;
+            const showLabel = document.createElement('label');
+            showLabel.htmlFor = showRadioId;
+            showLabel.className = 'filter-tag-radio-label';
+            const showRadio = document.createElement('input');
+            showRadio.type = 'radio';
+            showRadio.id = showRadioId;
+            showRadio.name = `filter-tag-${fullTag.replace(/[^a-zA-Z0-9]/g, '_')}`;
+            showRadio.value = 'show';
+            showRadio.checked = tagVisibilityState[fullTag] === 'show';
+            showRadio.addEventListener('change', () => {
+                tagVisibilityState[fullTag] = 'show';
+                refreshDisplayAndData();
+            });
+            showLabel.appendChild(showRadio);
+            showLabel.appendChild(document.createTextNode('Show'));
+            tagGroup.appendChild(showLabel);
+
+            const hideRadioId = `filter-tag-${fullTag.replace(/[^a-zA-Z0-9]/g, '_')}-hide`;
+            const hideLabel = document.createElement('label');
+            hideLabel.htmlFor = hideRadioId;
+            hideLabel.className = 'filter-tag-radio-label';
+            const hideRadio = document.createElement('input');
+            hideRadio.type = 'radio';
+            hideRadio.id = hideRadioId;
+            hideRadio.name = `filter-tag-${fullTag.replace(/[^a-zA-Z0-9]/g, '_')}`;
+            hideRadio.value = 'hide';
+            hideRadio.checked = tagVisibilityState[fullTag] === 'hide';
+            hideRadio.addEventListener('change', () => {
+                tagVisibilityState[fullTag] = 'hide';
+                refreshDisplayAndData();
+            });
+            hideLabel.appendChild(hideRadio);
+            hideLabel.appendChild(document.createTextNode('Hide'));
+            tagGroup.appendChild(hideLabel);
+            
+            prefixGroupContainer.appendChild(tagGroup);
+        });
+        filterContainer.appendChild(prefixGroupContainer);
+    });
+
+    // --- Render Filter B: Focus on Tag (remains largely the same, but uses full tag for value) ---
     const filterBTitle = document.createElement('h3');
     filterBTitle.textContent = 'Focus (Filter B):';
     focusFilterContainer.appendChild(filterBTitle);
@@ -1213,6 +1320,15 @@ function renderFilterUI() {
     focusCheckbox.checked = focusTagState.enabled;
     focusCheckbox.addEventListener('change', (event) => {
         focusTagState.enabled = event.target.checked;
+        focusSelect.disabled = !event.target.checked;
+        if (!event.target.checked) { // If disabling focus, clear selected tag state
+            focusTagState.selectedTag = null;
+            focusSelect.value = ''; // Reset dropdown to placeholder
+        } else if (focusSelect.options.length > 1 && focusSelect.value === '') {
+            // If enabling and no tag is selected, auto-select the first available tag for convenience
+            focusTagState.selectedTag = focusSelect.options[1].value; 
+            focusSelect.value = focusTagState.selectedTag;
+        }
         refreshDisplayAndData();
     });
     focusCheckboxLabel.appendChild(focusCheckbox);
@@ -1251,6 +1367,10 @@ function renderFilterUI() {
         if (!event.target.checked) { // If disabling focus, clear selected tag state
             focusTagState.selectedTag = null;
             focusSelect.value = ''; // Reset dropdown to placeholder
+        } else if (focusSelect.options.length > 1 && focusSelect.value === '') {
+            // If enabling and no tag is selected, auto-select the first available tag for convenience
+            focusTagState.selectedTag = focusSelect.options[1].value; 
+            focusSelect.value = focusTagState.selectedTag;
         }
         refreshDisplayAndData();
     });
@@ -1418,9 +1538,12 @@ function rebuildAllUniqueTagsAndRefreshFilters() {
     if (!jsonData || !jsonData.items) return;
 
     allUniqueTags.clear();
+    // Reset color mapping to ensure consistency if prefixes change
+    tagPrefixColorMap = {};
+    nextColorIndex = 0;
+
     jsonData.items.forEach(item => {
         // Ensure all items have their tags extracted/updated if they exist
-        // This is especially important if an item was just added/modified
         if (item.name) { // Check if item.name exists before trying to extract tags
              item.extractedTags = extractTagsFromString(item.name);
              item.extractedTags.forEach(tag => allUniqueTags.add(tag));
