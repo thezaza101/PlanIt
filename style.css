@@ -798,17 +798,59 @@ label { /* From original full set, ensure it's present if it was global */
     /* Text color will be set by JS */
 }
 
+.filter-prefix-header-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px; 
+}
+
+.filter-group-toggle-buttons {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px; /* Add some space below the prefix header */
+    margin-bottom: 8px; /* Space before the list of tags */
+}
+
+.filter-group-toggle-btn {
+    padding: 3px 8px;
+    font-size: 0.8em;
+    background-color: transparent;
+    border: 1px solid; /* Color will be set by JS */
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s ease, opacity 0.2s ease;
+}
+
+.filter-group-toggle-btn:hover {
+    opacity: 0.8;
+}
+
 .filter-prefix-group .filter-tag-group {
-    display: block; /* Ensure each tag within a prefix group is on a new line */
+    display: flex; /* Use flex to align label and radio buttons */
+    justify-content: space-between; /* Pushes radio buttons to the right */
+    align-items: center; /* Vertically align items */
     margin-bottom: 5px;
-    padding: 3px 0; /* Minimal padding for internal tag lines */
-    border: none; /* Remove individual borders if any were set by .filter-tag-group */
-    background-color: transparent; /* Inherit from parent */
-    /* Text color for radio button labels will be set by JS */
+    padding: 3px 0; 
+    border: none; 
+    background-color: transparent; 
+}
+
+.filter-tag-value-label {
+    margin-right: 10px; /* Space between tag value and radio buttons */
+    white-space: nowrap; /* Prevent tag value from wrapping unnecessarily */
+}
+
+.filter-tag-radio-container {
+    display: flex;
+    align-items: center;
+    gap: 10px; /* Gap between Show and Hide radio groups */
 }
 
 .filter-prefix-group .filter-tag-radio-label {
     /* Adjust if needed for better alignment or appearance within colored groups */
+    display: inline-flex; /* Helps with alignment of radio and text */
+    align-items: center;
 }
 
 .filter-tag-group label.filter-tag-radio-label {

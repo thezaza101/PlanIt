@@ -64,6 +64,8 @@ const allFiltersContainer = document.getElementById('allFiltersContainer');
 let originalFileName = 'edited_data.json';
 /** @type {object|null} Stores the parsed JSON data from the loaded file. */
 let jsonData = null;
+/** @type {number|null} Stores the original ID of an item being edited. */
+let currentEditingOriginalId = null;
 
 // Color Management for Tag Prefixes
 let tagPrefixColorMap = {};
@@ -678,6 +680,7 @@ function openModal(title = 'Add/Edit Item') {
  */
 function closeModal() {
     itemModal.style.display = 'none';
+    currentEditingOriginalId = null; // Clear the original ID
     
     // Remove the dynamically added delete button if it exists
     const modalDeleteButton = document.getElementById('modalDeleteButton');
@@ -730,9 +733,10 @@ function openModifyModal(id) {
         alert('Item not found!');
         return;
     }
+    currentEditingOriginalId = item.id; // Store the original ID
     openModal(`Modify Item (ID: ${id})`);
     itemIdInput.value = item.id;
-    itemIdInput.readOnly = true; // Make ID read-only for existing items
+    itemIdInput.readOnly = false; // Allow ID to be edited
     itemNameInput.value = item.name || '';
     itemDescriptionInput.value = item.description || '';
     itemBucketSelect.value = item.bucket || '';
@@ -828,12 +832,19 @@ itemForm.addEventListener('submit', function(event) {
         return;
     }
 
-    const isNewItem = !itemIdInput.readOnly; // Check if we are adding a new item
+    const isNewItem = currentEditingOriginalId === null; // New item if no original ID was stored
+    const oldId = isNewItem ? null : currentEditingOriginalId;
 
     if (isNewItem) {
         // Check for ID uniqueness only for new items
         if (jsonData.items.some(item => item.id === id)) {
             alert(`An item with ID ${id} already exists. Please choose a unique ID.`);
+            return;
+        }
+    } else if (oldId !== id) {
+        // ID has changed for an existing item, check for uniqueness against OTHER items
+        if (jsonData.items.some(item => item.id === id && item.id !== oldId)) {
+            alert(`An item with ID ${id} already exists (collides with another item). Please choose a unique ID.`);
             return;
         }
     }
@@ -889,14 +900,33 @@ itemForm.addEventListener('submit', function(event) {
 
     newItemData.extractedTags = extractTagsFromString(newItemData.name);
 
-    const existingItemIndex = itemIdInput.value ? jsonData.items.findIndex(item => item.id === id) : -1;
-
-    if (existingItemIndex > -1) {
-        // Update existing item
-        jsonData.items[existingItemIndex] = newItemData;
-    } else {
+    if (isNewItem) {
         // Add new item
         jsonData.items.push(newItemData);
+    } else {
+        // Update existing item
+        const existingItemIndex = jsonData.items.findIndex(item => item.id === oldId);
+        if (existingItemIndex > -1) {
+            // If ID changed, update predecessors in other items first
+            if (oldId !== id) {
+                jsonData.items.forEach(item => {
+                    if (item.id === oldId && item !== jsonData.items[existingItemIndex]) return; // Skip self if somehow it lists itself (should not happen)
+
+                    if (Array.isArray(item.predecessor)) {
+                        const predIndex = item.predecessor.indexOf(oldId);
+                        if (predIndex > -1) {
+                            item.predecessor[predIndex] = id;
+                        }
+                    } else if (item.predecessor === oldId) {
+                        item.predecessor = id;
+                    }
+                });
+            }
+            jsonData.items[existingItemIndex] = newItemData; // Update the item itself
+        } else {
+            alert(`Error: Original item with ID ${oldId} not found for update. This should not happen.`);
+            return; // Avoid further issues
+        }
     }
 
     closeModal();
@@ -1250,7 +1280,41 @@ function renderFilterUI() {
         prefixHeader.className = 'filter-prefix-header';
         prefixHeader.textContent = prefix;
         prefixHeader.style.color = getTextColorForBackground(bgColor);
-        prefixGroupContainer.appendChild(prefixHeader);
+        prefixGroupContainer.appendChild(prefixHeader); // Add header first
+
+        // Add Show All / Hide All buttons for this prefix group
+        const groupToggleButtonContainer = document.createElement('div');
+        groupToggleButtonContainer.className = 'filter-group-toggle-buttons';
+
+        const showAllButton = document.createElement('button');
+        showAllButton.textContent = 'Show All';
+        showAllButton.className = 'filter-group-toggle-btn';
+        showAllButton.style.color = getTextColorForBackground(bgColor);
+        showAllButton.style.borderColor = getTextColorForBackground(bgColor);
+        showAllButton.onclick = () => {
+            tagsByPrefix[prefix].forEach(tagInfo => {
+                tagVisibilityState[tagInfo.fullTag] = 'show';
+            });
+            renderFilterUI(); // Re-render to update radio buttons
+            refreshDisplayAndData();
+        };
+        groupToggleButtonContainer.appendChild(showAllButton);
+
+        const hideAllButton = document.createElement('button');
+        hideAllButton.textContent = 'Hide All';
+        hideAllButton.className = 'filter-group-toggle-btn';
+        hideAllButton.style.color = getTextColorForBackground(bgColor);
+        hideAllButton.style.borderColor = getTextColorForBackground(bgColor);
+        hideAllButton.onclick = () => {
+            tagsByPrefix[prefix].forEach(tagInfo => {
+                tagVisibilityState[tagInfo.fullTag] = 'hide';
+            });
+            renderFilterUI(); // Re-render to update radio buttons
+            refreshDisplayAndData();
+        };
+        groupToggleButtonContainer.appendChild(hideAllButton);
+
+        prefixGroupContainer.appendChild(groupToggleButtonContainer); // Add buttons after header
 
         tagsByPrefix[prefix].sort((a,b) => a.value.localeCompare(b.value)).forEach(tagInfo => {
             const fullTag = tagInfo.fullTag; // Use the full tag for state management
@@ -1260,11 +1324,16 @@ function renderFilterUI() {
             }
 
             const tagGroup = document.createElement('div');
-            tagGroup.className = 'filter-tag-group'; // Use existing class if suitable, or new one
-            tagGroup.style.color = getTextColorForBackground(bgColor); // Text color for radio labels
+            tagGroup.className = 'filter-tag-group'; 
+            tagGroup.style.color = getTextColorForBackground(bgColor);
 
-            const displayedTagValue = prefix === 'GENERAL' ? tagInfo.value : `${prefix}:${tagInfo.value}`;
-            tagGroup.appendChild(document.createTextNode(`${tagInfo.value}: `)); // Display only the value part or full for GENERAL
+            const tagValueLabel = document.createElement('span');
+            tagValueLabel.className = 'filter-tag-value-label';
+            tagValueLabel.textContent = `${tagInfo.value}: `;
+            tagGroup.appendChild(tagValueLabel);
+
+            const radioContainer = document.createElement('div'); // Container for radio buttons
+            radioContainer.className = 'filter-tag-radio-container';
 
             const showRadioId = `filter-tag-${fullTag.replace(/[^a-zA-Z0-9]/g, '_')}-show`;
             const showLabel = document.createElement('label');
@@ -1276,13 +1345,9 @@ function renderFilterUI() {
             showRadio.name = `filter-tag-${fullTag.replace(/[^a-zA-Z0-9]/g, '_')}`;
             showRadio.value = 'show';
             showRadio.checked = tagVisibilityState[fullTag] === 'show';
-            showRadio.addEventListener('change', () => {
-                tagVisibilityState[fullTag] = 'show';
-                refreshDisplayAndData();
-            });
             showLabel.appendChild(showRadio);
             showLabel.appendChild(document.createTextNode('Show'));
-            tagGroup.appendChild(showLabel);
+            radioContainer.appendChild(showLabel); // Add to radio container
 
             const hideRadioId = `filter-tag-${fullTag.replace(/[^a-zA-Z0-9]/g, '_')}-hide`;
             const hideLabel = document.createElement('label');
@@ -1294,14 +1359,11 @@ function renderFilterUI() {
             hideRadio.name = `filter-tag-${fullTag.replace(/[^a-zA-Z0-9]/g, '_')}`;
             hideRadio.value = 'hide';
             hideRadio.checked = tagVisibilityState[fullTag] === 'hide';
-            hideRadio.addEventListener('change', () => {
-                tagVisibilityState[fullTag] = 'hide';
-                refreshDisplayAndData();
-            });
             hideLabel.appendChild(hideRadio);
             hideLabel.appendChild(document.createTextNode('Hide'));
-            tagGroup.appendChild(hideLabel);
+            radioContainer.appendChild(hideLabel); // Add to radio container
             
+            tagGroup.appendChild(radioContainer); // Add radio container to tag group
             prefixGroupContainer.appendChild(tagGroup);
         });
         filterContainer.appendChild(prefixGroupContainer);
