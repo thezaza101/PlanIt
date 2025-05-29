@@ -1345,6 +1345,12 @@ function renderFilterUI() {
             showRadio.name = `filter-tag-${fullTag.replace(/[^a-zA-Z0-9]/g, '_')}`;
             showRadio.value = 'show';
             showRadio.checked = tagVisibilityState[fullTag] === 'show';
+            showRadio.addEventListener('change', () => {
+                if (showRadio.checked) {
+                    tagVisibilityState[fullTag] = 'show';
+                    refreshDisplayAndData();
+                }
+            });
             showLabel.appendChild(showRadio);
             showLabel.appendChild(document.createTextNode('Show'));
             radioContainer.appendChild(showLabel); // Add to radio container
@@ -1359,6 +1365,12 @@ function renderFilterUI() {
             hideRadio.name = `filter-tag-${fullTag.replace(/[^a-zA-Z0-9]/g, '_')}`;
             hideRadio.value = 'hide';
             hideRadio.checked = tagVisibilityState[fullTag] === 'hide';
+            hideRadio.addEventListener('change', () => {
+                if (hideRadio.checked) {
+                    tagVisibilityState[fullTag] = 'hide';
+                    refreshDisplayAndData();
+                }
+            });
             hideLabel.appendChild(hideRadio);
             hideLabel.appendChild(document.createTextNode('Hide'));
             radioContainer.appendChild(hideLabel); // Add to radio container
