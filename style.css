@@ -863,4 +863,166 @@ label { /* From original full set, ensure it's present if it was global */
     vertical-align: middle;
     width: auto;
     padding: 0;
+}
+
+@media print {
+    body {
+        font-family: Arial, sans-serif; /* Use a common print-friendly font */
+        background-color: #fff !important; /* Ensure white background */
+        color: #000 !important; /* Ensure black text */
+        margin: 0;
+        padding: 0;
+        -webkit-print-color-adjust: exact; /* Attempt to force exact colors and backgrounds */
+        print-color-adjust: exact;
+    }
+
+    .app-header,
+    .main-controls-container,
+    #filtersSection,
+    #jsonDisplayContainer,
+    #analyticsSection,
+    .modal, /* Hide modals */
+    .add-item-btn,
+    .remove-bucket-btn,
+    #saveButton,
+    #addBucketButton,
+    .close-btn,
+    .modal-buttons button[type="button"], /* Hide cancel buttons in modals if they were somehow visible */
+    .item-controls, /* Hide edit/delete buttons on cards */
+    #jsonDisplayToggle,
+    #analyticsToggle,
+    #filtersToggle {
+        display: none !important;
+    }
+
+    #swimlaneContainerWrapper {
+        padding: 10px !important;
+        margin: 0 !important;
+        border: none !important;
+        background-color: #fff !important;
+        box-shadow: none !important;
+        overflow: visible !important; /* Show all content */
+        height: auto !important;
+        width: 100% !important; /* Use full page width */
+    }
+    
+    #swimlaneContainerWrapper h2 { /* Visual Plan title */
+        text-align: left;
+        font-size: 1.5em;
+        margin-bottom: 10px;
+    }
+
+    #swimlaneContainer {
+        display: flex;
+        flex-direction: row; /* Keep swimlanes in a row if possible */
+        flex-wrap: wrap; /* Allow wrapping to next line if they overflow page width */
+        overflow: visible !important; /* Show all content */
+        height: auto !important;
+        width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        gap: 15px !important; /* Adjust gap for print */
+        border: none !important;
+        background-color: transparent !important;
+    }
+
+    .swimlane {
+        min-width: 200px; /* Adjust as needed, or let them flow */
+        max-width: none; /* Allow to take space or wrap */
+        background-color: #fff !important;
+        border: 1px solid #ccc !important;
+        box-shadow: none !important;
+        padding: 10px !important;
+        margin-bottom: 15px; /* Space between wrapped rows of swimlanes */
+        page-break-inside: avoid !important; /* Try to keep a swimlane on one page */
+        flex-grow: 1; /* Allow swimlanes to grow to fill available space if wrapping */
+        /* flex-basis: calc(50% - 10px); For two columns, adjust as needed */
+    }
+    
+    .swimlane-header h3 {
+        font-size: 1.1em;
+    }
+    
+    .bucket-description {
+        font-size: 0.8em;
+        border-bottom: 1px dashed #eee;
+    }
+
+    .itemCard {
+        background-color: #f9f9f9 !important;
+        border: 1px solid #ddd !important;
+        box-shadow: none !important;
+        padding: 8px !important;
+        margin-bottom: 8px !important;
+        page-break-inside: avoid !important; /* Try to keep an item card on one page */
+    }
+    
+    .itemCard h4, .itemCard a.item-name-link {
+        font-size: 1em;
+        color: #000 !important;
+        text-decoration: none;
+    }
+    
+    .itemCard p {
+        font-size: 0.85em;
+        max-height: none !important; /* Show full description */
+        overflow: visible !important;
+    }
+
+    .item-tags .tag {
+        background-color: #eee !important;
+        color: #333 !important;
+        border: 1px solid #ccc;
+        padding: 1px 4px;
+        font-size: 0.7em;
+    }
+    
+    .item-efforts {
+        font-size: 0.75em;
+        border-top: 1px dashed #eee;
+    }
+
+    .bucket-effort-summary {
+        font-size: 0.8em;
+        padding-top: 5px;
+        margin-top: 10px;
+    }
+    .bucket-effort-summary hr {
+        border-top: 1px solid #eee;
+    }
+
+
+    #arrowCanvas {
+        position: relative !important; /* Changed from absolute to try to keep it in flow */
+        width: 100% !important; /* Or adjust based on swimlanecontainer's actual printed width */
+        height: auto !important; /* Adjust based on content */
+        /* SVG elements within should scale or be redrawn.
+           This might still be tricky. The arrows might need to be redrawn
+           on a 'beforeprint' event if their positioning is highly dynamic
+           and based on screen coordinates rather than relative SVG coordinates.
+           For now, we ensure the canvas itself is part of the flow. */
+        z-index: 10 !important; /* Ensure arrows are on top */
+        overflow: visible !important;
+    }
+
+    #arrowCanvas svg line {
+        stroke: #333 !important; /* Ensure arrows are visible */
+    }
+    #arrowCanvas svg marker polygon {
+        fill: #333 !important; /* Ensure arrowheads are visible */
+    }
+
+    /* Ensure specific status background colors are printed if possible */
+    .item-status-in_progress {
+        background-color: #e6f7ff !important;
+        border-left-color: #1890ff !important;
+    }
+    .item-status-on_hold {
+        background-color: #fffbe6 !important;
+        border-left-color: #faad14 !important;
+    }
+    .item-status-completed {
+        background-color: #f6ffed !important;
+        border-left-color: #52c41a !important;
+    }
 } 
