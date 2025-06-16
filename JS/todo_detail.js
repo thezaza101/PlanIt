@@ -416,8 +416,9 @@ function addNewCard(parentId = null) {
     const newCardData = {
         id: newCardId,
         todo_id: currentTodo.ID,
-        parent_id: parentId, // This is the key change
+        parent_id: parentId,
         content: 'New Card',
+        additional_info: '',
         type: 'Information',
         status: 'New',
         x: undefined,
@@ -469,6 +470,7 @@ function openCardEditModal(card) {
     currentlyEditedCardId = card.id;
     document.getElementById('editCardId').value = card.id;
     document.getElementById('editCardContent').value = card.content || '';
+    document.getElementById('editCardAdditionalInfo').value = card.additional_info || '';
     document.getElementById('editCardType').value = card.type || 'Information';
     document.getElementById('editCardStatus').value = card.status || 'New';
     document.getElementById('cardEditModal').style.display = 'block';
@@ -483,11 +485,13 @@ document.getElementById('cardEditForm').onsubmit = function(e) {
     e.preventDefault();
     const id = parseInt(document.getElementById('editCardId').value, 10);
     const content = document.getElementById('editCardContent').value;
+    const additional_info = document.getElementById('editCardAdditionalInfo').value;
     const type = document.getElementById('editCardType').value;
     const status = document.getElementById('editCardStatus').value;
     const card = allDetailData.find(c => c.id === id);
     if (card) {
         card.content = content;
+        card.additional_info = additional_info;
         card.type = type;
         card.status = status;
     }
