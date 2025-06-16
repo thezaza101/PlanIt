@@ -1,6 +1,3 @@
-const fileInput = document.getElementById('fileInput');
-const jsonDisplay = document.getElementById('jsonDisplay');
-const saveButton = document.getElementById('saveButton');
 const swimlaneContainer = document.getElementById('swimlaneContainer');
 const arrowCanvas = document.getElementById('arrowCanvas');
 const itemModal = document.getElementById('itemModal');
@@ -38,11 +35,6 @@ let tagVisibilityState = {};
 /** @type {FocusTagState} Stores the state for the focus filter (Filter B). */
 let focusTagState = { enabled: false, selectedTag: null };
 
-// JSON Display Toggle Elements
-const jsonDisplayContainer = document.getElementById('jsonDisplayContainer'); // Though not directly used in toggle, good to have if needed
-const jsonDisplayToggle = document.getElementById('jsonDisplayToggle');
-const jsonToggleIndicator = document.getElementById('jsonToggleIndicator');
-
 // Analytics Section Elements
 const analyticsToggle = document.getElementById('analyticsToggle');
 const analyticsToggleIndicator = document.getElementById('analyticsToggleIndicator');
@@ -69,6 +61,7 @@ let currentEditingOriginalId = null;
 
 // Color Management for Tag Prefixes
 let tagPrefixColorMap = {};
+let tagColorMap = {};
 const availableColors = [
     '#ADD8E6', // LightBlue
     '#FFB6C1', // LightPink
@@ -98,6 +91,20 @@ function getTagPrefixAndValue(tagString) {
         return { prefix: parts[0], value: parts.slice(1).join(':'), original: tagString };
     }
     return { prefix: 'GENERAL', value: tagString, original: tagString };
+}
+
+/**
+ * Assigns and retrieves a color for a given full tag string.
+ * Uses a predefined list of available colors in a round-robin fashion.
+ * @param {string} tag - The full tag string (e.g., "APP:ELH").
+ * @returns {string} The hex color code.
+ */
+function getColorForTag(tag) {
+    if (!tagColorMap[tag]) {
+        tagColorMap[tag] = availableColors[nextColorIndex % availableColors.length];
+        nextColorIndex++;
+    }
+    return tagColorMap[tag];
 }
 
 /**
@@ -161,20 +168,6 @@ function stripTagsFromName(name) {
     return name.replace(/\[.*?\]\s*/g, '').trim(); // Simpler regex: Remove tags and leading/trailing whitespace
 }
 
-// Initialize JSON display state from localStorage
-if (jsonDisplayToggle && jsonDisplay && jsonToggleIndicator) {
-    const isJsonCollapsed = localStorage.getItem('jsonDisplayCollapsed') !== 'false';
-    if (isJsonCollapsed) {
-        jsonDisplay.classList.add('collapsed');
-        jsonToggleIndicator.textContent = '(Show)';
-    } else {
-        jsonDisplay.classList.remove('collapsed');
-        jsonToggleIndicator.textContent = '(Hide)';
-    }
-    // Arrows will be drawn by initial renderSwimlanes if data loads,
-    // or if a toggle happens before data load, nothing happens, which is fine.
-}
-
 // Initialize Analytics display state from localStorage
 /** 
  * Initializes the display state (collapsed/expanded) of the Analytics section 
@@ -191,96 +184,6 @@ if (analyticsToggle && analyticsContent && analyticsToggleIndicator) {
     }
     // Arrows will be drawn by initial renderSwimlanes if data loads.
 }
-
-/**
- * Handles the file input 'change' event.
- * Reads the selected JSON file, parses it, and triggers rendering of the UI.
- */
-fileInput.addEventListener('change', function(event) {
-    const file = event.target.files[0];
-    if (file) {
-        originalFileName = file.name;
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            try {
-                const content = e.target.result;
-                jsonData = JSON.parse(content);
-                jsonDisplay.value = JSON.stringify(jsonData, null, 4);
-
-                // Process tags from items
-                allUniqueTags.clear();
-                if (jsonData.items) {
-                    jsonData.items.forEach(item => {
-                        item.extractedTags = extractTagsFromString(item.name);
-                        item.extractedTags.forEach(tag => allUniqueTags.add(tag));
-                    });
-                }
-                renderFilterUI(); // Render filter options
-                calculateAndRenderAnalytics(); // Calculate and Render Analytics
-
-                renderSwimlanes(jsonData);
-                populateBucketSelector();
-                requestAnimationFrame(() => {
-                     requestAnimationFrame(() => {
-                        drawDependencyArrows(jsonData);
-                    });
-                });
-            } catch (error) {
-                alert('Error parsing JSON file: ' + error.message);
-                jsonDisplay.value = "Error: Could not load or parse the JSON file. Please ensure it's a valid JSON format.";
-                swimlaneContainer.innerHTML = '';
-                arrowCanvas.innerHTML = '';
-                jsonData = null;
-                itemBucketSelect.innerHTML = '';
-            }
-        };
-        reader.onerror = function() {
-            alert('Error reading file.');
-            jsonDisplay.value = "Error: Could not read the file.";
-        };
-        reader.readAsText(file);
-    }
-});
-
-/**
- * Handles the click event for the save button.
- * Converts the content of the JSON display textarea to a Blob and initiates a download.
- * Validates if the content is valid JSON before attempting to save.
- */
-saveButton.addEventListener('click', function() {
-    let contentToSave = jsonDisplay.value;
-    try {
-        // Validate that the content is valid JSON before saving
-        JSON.parse(contentToSave); 
-    } catch (error) {
-        alert('The content in the editor is not valid JSON. Please correct it before saving.\nError: ' + error.message);
-        return;
-    }
-
-    const blob = new Blob([contentToSave], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = originalFileName; // Suggest the original file name or a default
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-});
-
-/**
- * Handles the scroll event on the swimlane container.
- * Redraws dependency arrows with a delay using requestAnimationFrame to ensure layout updates are processed.
- */
-swimlaneContainer.addEventListener('scroll', function() {
-    if (jsonData) {
-        requestAnimationFrame(() => {
-            if (typeof getFilteredDataForArrows === 'function') {
-                drawDependencyArrows(getFilteredDataForArrows());
-            }
-        });
-    }
-});
 
 /**
  * Renders the swimlanes and item cards based on the provided data and current filter states.
@@ -387,11 +290,10 @@ function renderSwimlanes(data) {
                 item.extractedTags.forEach(tag => {
                     const tagSpan = document.createElement('span');
                     tagSpan.className = 'tag';
-                    tagSpan.textContent = tag;
 
-                    // Apply new color logic
+                    // Apply new color logic for unique tags
                     const tagParts = getTagPrefixAndValue(tag);
-                    const bgColor = getColorForTagPrefix(tagParts.prefix);
+                    const bgColor = getColorForTag(tag); // Use full tag for color
                     tagSpan.style.backgroundColor = bgColor;
                     tagSpan.style.color = getTextColorForBackground(bgColor);
                     // Display prefix:value or just value if prefix is GENERAL
@@ -541,87 +443,50 @@ function getFilteredDataForArrows() {
  *                      Typically, this should be the output of `getFilteredDataForArrows()`.
  */
 function drawDependencyArrows(data) {
-    arrowCanvas.innerHTML = '';
+    // Debounce arrow drawing
+    clearTimeout(window.arrowDrawTimeout);
+    window.arrowDrawTimeout = setTimeout(() => {
+        _drawDependencyArrows(data);
+    }, 50); // 50ms debounce
+}
 
-    if (!data || !data.items || data.items.length === 0) { 
-        return;
-    }
+function _drawDependencyArrows(data) {
+    if (!data || !data.items) return;
+    const items = getFilteredDataForArrows(); // Use filtered data
 
-    const swimlaneContainerRect = swimlaneContainer.getBoundingClientRect();
-    const arrowCanvasRect = arrowCanvas.getBoundingClientRect();
+    arrowCanvas.innerHTML = ''; // Clear previous arrows
+    const containerRect = swimlaneContainer.getBoundingClientRect();
+    const svgRect = arrowCanvas.getBoundingClientRect();
+    const containerScrollTop = swimlaneContainer.scrollTop;
+    const containerScrollLeft = swimlaneContainer.scrollLeft;
 
-    const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-    const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
-    marker.setAttribute('id', 'arrowhead');
-    marker.setAttribute('markerWidth', '10');
-    marker.setAttribute('markerHeight', '7');
-    marker.setAttribute('refX', '10');
-    marker.setAttribute('refY', '3.5');
-    marker.setAttribute('orient', 'auto');
-    const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-    polygon.setAttribute('points', '0 0, 10 3.5, 0 7');
-    polygon.setAttribute('fill', '#555');
-    marker.appendChild(polygon);
-    defs.appendChild(marker);
-    arrowCanvas.appendChild(defs);
+    items.forEach(item => {
+        if (!item.predecessors || item.predecessors.length === 0) return;
 
-    data.items.forEach(successorItem => {
-        if (successorItem.predecessor) {
-            const predecessors = Array.isArray(successorItem.predecessor) ? successorItem.predecessor : [successorItem.predecessor];
-            const successorElement = swimlaneContainer.querySelector(`.itemCard[data-id='${successorItem.id}']`);
+        const successorsElem = document.getElementById(`item-${item.id}`);
+        if (!successorsElem) return;
 
-            if (!successorElement) return;
+        item.predecessors.forEach(predecessorId => {
+            const predecessorElem = document.getElementById(`item-${predecessorId}`);
+            if (!predecessorElem) return; // Predecessor might be filtered out
 
-            const successorRect = successorElement.getBoundingClientRect();
+            const predecessorRect = predecessorElem.getBoundingClientRect();
+            const successorsRect = successorsElem.getBoundingClientRect();
 
-            predecessors.forEach(predId => {
-                const predecessorItem = data.items.find(p => p.id === predId);
-                if (!predecessorItem) return;
+            // Check if both elements are visible
+            const isPredecessorVisible = (predecessorRect.top < containerRect.bottom) && (predecessorRect.bottom > containerRect.top);
+            const isSuccessorVisible = (successorsRect.top < containerRect.bottom) && (successorsRect.bottom > containerRect.top);
 
-                const predecessorElement = swimlaneContainer.querySelector(`.itemCard[data-id='${predId}']`);
-                if (!predecessorElement) return;
+            if (!isPredecessorVisible || !isSuccessorVisible) return;
 
-                const predecessorRect = predecessorElement.getBoundingClientRect();
+            const startX = predecessorRect.right - svgRect.left - containerScrollLeft;
+            const startY = predecessorRect.top + predecessorRect.height / 2 - svgRect.top;
+            const endX = successorsRect.left - svgRect.left - containerScrollLeft;
+            const endY = successorsRect.top + successorsRect.height / 2 - svgRect.top;
 
-                let x1, y1, x2, y2; // Start (predecessor) and End (successor) points for the arrow
-
-                if (successorItem.bucket === predecessorItem.bucket) {
-                    // Same bucket: Draw a vertical arrow
-                    if (predecessorRect.top < successorRect.top) { // Predecessor is visually above successor
-                        x1 = predecessorRect.left - arrowCanvasRect.left + predecessorRect.width / 2; // Bottom-center of predecessor
-                        y1 = predecessorRect.bottom - arrowCanvasRect.top;
-                        x2 = successorRect.left - arrowCanvasRect.left + successorRect.width / 2;   // Top-center of successor
-                        y2 = successorRect.top - arrowCanvasRect.top;
-                    } else { // Predecessor is visually below or at the same level as successor
-                        x1 = predecessorRect.left - arrowCanvasRect.left + predecessorRect.width / 2; // Top-center of predecessor
-                        y1 = predecessorRect.top - arrowCanvasRect.top;
-                        x2 = successorRect.left - arrowCanvasRect.left + successorRect.width / 2;   // Bottom-center of successor
-                        y2 = successorRect.bottom - arrowCanvasRect.top;
-                    }
-                } else {
-                    // Different buckets: Draw a horizontal-ish arrow
-                    x1 = predecessorRect.right - arrowCanvasRect.left;                       // Right-middle of predecessor
-                    y1 = predecessorRect.top - arrowCanvasRect.top + predecessorRect.height / 2;
-                    x2 = successorRect.left - arrowCanvasRect.left;                          // Left-middle of successor
-                    y2 = successorRect.top - arrowCanvasRect.top + successorRect.height / 2;
-                }
-                
-                // Prevent drawing arrow if start and end points are identical or extremely close
-                if (Math.hypot(x2 - x1, y2 - y1) < 2) { 
-                    return; 
-                }
-
-                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                line.setAttribute('x1', x1.toString());
-                line.setAttribute('y1', y1.toString());
-                line.setAttribute('x2', x2.toString());
-                line.setAttribute('y2', y2.toString());
-                line.setAttribute('stroke', '#555');
-                line.setAttribute('stroke-width', '1.5');
-                line.setAttribute('marker-end', 'url(#arrowhead)');
-                arrowCanvas.appendChild(line);
-            });
-        }
+            // Draw line and arrowhead
+            createArrowElement(startX, startY, endX, endY);
+        });
     });
 }
 
@@ -631,9 +496,6 @@ function drawDependencyArrows(data) {
  */
 function refreshDisplayAndData() {
     if (!jsonData) return;
-
-    // 1. Update JSON in textarea (always shows full, unfiltered data)
-    jsonDisplay.value = JSON.stringify(jsonData, null, 4);
 
     // 2. Re-render swimlanes (will use activeTagFilters internally)
     renderSwimlanes(jsonData);
@@ -649,6 +511,7 @@ function refreshDisplayAndData() {
     populateBucketSelector();
     // 5. (Re)-render filter UI (in case tags changed, though not implemented dynamically for now)
     // renderFilterUI(); // Potentially call if tags could change dynamically
+    rebuildAllUniqueTagsAndRefreshFilters();
 }
 
 /**
@@ -744,13 +607,10 @@ function openModifyModal(id) {
     itemDesignEffortInput.value = item.design_effort || '';
     itemBuildEffortInput.value = item.build_effort || '';
     itemTestEffortInput.value = item.test_effort || '';
-    if (Array.isArray(item.predecessor)) {
-        itemPredecessorsInput.value = item.predecessor.join(', ');
-    } else if (item.predecessor) {
-        itemPredecessorsInput.value = item.predecessor.toString();
-    } else {
-        itemPredecessorsInput.value = '';
-    }
+    
+    // Handle predecessors - ensures we work with an array
+    const predecessors = Array.isArray(item.predecessors) ? item.predecessors : [];
+    itemPredecessorsInput.value = predecessors.join(', ');
 
     // Add Delete button to the modal
     const modalButtonsDiv = itemForm.querySelector('.modal-buttons');
@@ -788,15 +648,15 @@ function deleteItem(id) {
 
             // Also remove this ID from any other item's predecessor list
             jsonData.items.forEach(item => {
-                if (Array.isArray(item.predecessor)) {
-                    item.predecessor = item.predecessor.filter(predId => predId !== id);
-                    if (item.predecessor.length === 0) {
-                        delete item.predecessor; // Remove empty array
-                    } else if (item.predecessor.length === 1) {
-                        item.predecessor = item.predecessor[0]; // Convert to single value if only one left
+                if (Array.isArray(item.predecessors)) {
+                    item.predecessors = item.predecessors.filter(predId => predId !== id);
+                    if (item.predecessors.length === 0) {
+                        delete item.predecessors; // Remove empty array
+                    } else if (item.predecessors.length === 1) {
+                        item.predecessors = item.predecessors[0]; // Convert to single value if only one left
                     }
-                } else if (item.predecessor === id) {
-                    delete item.predecessor;
+                } else if (item.predecessors === id) {
+                    delete item.predecessors;
                 }
             });
 
@@ -856,7 +716,7 @@ itemForm.addEventListener('submit', function(event) {
     const designEffort = parseFloat(itemDesignEffortInput.value) || 0;
     const buildEffort = parseFloat(itemBuildEffortInput.value) || 0;
     const testEffort = parseFloat(itemTestEffortInput.value) || 0;
-    let predecessors = itemPredecessorsInput.value.split(',')
+    const predecessors = itemPredecessorsInput.value.split(',')
                         .map(p => parseInt(p.trim()))
                         .filter(p => !isNaN(p) && p !== id); // Filter out NaNs and self-references
 
@@ -893,9 +753,9 @@ itemForm.addEventListener('submit', function(event) {
     };
 
     if (predecessors.length > 0) {
-        newItemData.predecessor = predecessors.length === 1 ? predecessors[0] : predecessors;
+        newItemData.predecessors = predecessors.length === 1 ? predecessors[0] : predecessors;
     } else {
-        delete newItemData.predecessor; // Ensure no empty predecessor array/value
+        delete newItemData.predecessors; // Ensure no empty predecessor array/value
     }
 
     newItemData.extractedTags = extractTagsFromString(newItemData.name);
@@ -912,13 +772,13 @@ itemForm.addEventListener('submit', function(event) {
                 jsonData.items.forEach(item => {
                     if (item.id === oldId && item !== jsonData.items[existingItemIndex]) return; // Skip self if somehow it lists itself (should not happen)
 
-                    if (Array.isArray(item.predecessor)) {
-                        const predIndex = item.predecessor.indexOf(oldId);
+                    if (Array.isArray(item.predecessors)) {
+                        const predIndex = item.predecessors.indexOf(oldId);
                         if (predIndex > -1) {
-                            item.predecessor[predIndex] = id;
+                            item.predecessors[predIndex] = id;
                         }
-                    } else if (item.predecessor === oldId) {
-                        item.predecessor = id;
+                    } else if (item.predecessors === oldId) {
+                        item.predecessors = id;
                     }
                 });
             }
@@ -971,13 +831,13 @@ function deleteBucket(bucketName) {
         jsonData.items = jsonData.items.filter(item => item.bucket !== bucketName);
         // Since items are removed, we also need to update predecessors in other items
         jsonData.items.forEach(item => {
-            if (Array.isArray(item.predecessor)) {
-                item.predecessor = item.predecessor.filter(predId => jsonData.items.some(i => i.id === predId));
-                if (item.predecessor.length === 0) delete item.predecessor;
-                else if (item.predecessor.length === 1) item.predecessor = item.predecessor[0];
+            if (Array.isArray(item.predecessors)) {
+                item.predecessors = item.predecessors.filter(predId => jsonData.items.some(i => i.id === predId));
+                if (item.predecessors.length === 0) delete item.predecessors;
+                else if (item.predecessors.length === 1) item.predecessors = item.predecessors[0];
             }
-             else if (item.predecessor && !jsonData.items.some(i => i.id === item.predecessor)) {
-                delete item.predecessor;
+             else if (item.predecessors && !jsonData.items.some(i => i.id === item.predecessors)) {
+                delete item.predecessors;
             }
         });
 
@@ -1024,29 +884,6 @@ bucketForm.addEventListener('submit', function(event) {
     refreshDisplayAndData();
     rebuildAllUniqueTagsAndRefreshFilters();
 });
-
-// JSON Display Toggle Functionality
-/**
- * Initializes and handles the click event for toggling the JSON display area (collapse/expand).
- * Persists the state in localStorage and redraws dependency arrows.
- */
-if (jsonDisplayToggle && jsonDisplay && jsonToggleIndicator) {
-    jsonDisplayToggle.addEventListener('click', () => {
-        const isCollapsed = jsonDisplay.classList.toggle('collapsed');
-        if (isCollapsed) {
-            jsonToggleIndicator.textContent = '(Show)';
-            localStorage.setItem('jsonDisplayCollapsed', 'true');
-        } else {
-            jsonToggleIndicator.textContent = '(Hide)';
-            localStorage.setItem('jsonDisplayCollapsed', 'false');
-        }
-        requestAnimationFrame(() => {
-            if (jsonData && typeof getFilteredDataForArrows === 'function') {
-                drawDependencyArrows(getFilteredDataForArrows());
-            }
-        });
-    });
-}
 
 // Analytics Display Toggle Functionality
 /**
@@ -1465,12 +1302,12 @@ function calculateAndRenderAnalytics() {
 
     const effortsByTag = {};
     const grandTotals = { design: 0, build: 0, test: 0, total: 0, itemCount: 0 };
-    const statusOrder = ['new', 'in_progress', 'on_hold', 'completed']; // Define status order for rendering
+    const statusOrder = ['new', 'on_hold', 'in_progress', 'completed']; // Define status order for rendering
     const statusColors = {
-        'new': '#f8f9fa', // Default item card background, subtle enough for a row
-        'in_progress': '#e6f7ff', // Light blue from .item-status-in_progress
-        'on_hold': '#fffbe6',     // Light yellow from .item-status-on_hold
-        'completed': '#f6ffed'   // Light green from .item-status-completed
+        'new': '#6c757d', // Grey
+        'in_progress': '#0d6efd', // Blue
+        'on_hold': '#ffc107',     // Yellow
+        'completed': '#198754'   // Green
     };
 
     // Use the original, unfiltered jsonData.items for analytics
@@ -1488,7 +1325,9 @@ function calculateAndRenderAnalytics() {
 
         const itemStatus = (item.status || 'new').toLowerCase().replace(/\s+/g, '_');
 
-        (item.extractedTags || []).forEach(tag => {
+        const tags = (item.extractedTags && item.extractedTags.length > 0) ? item.extractedTags : ['UNTAGGED'];
+
+        tags.forEach(tag => {
             if (!effortsByTag[tag]) {
                 effortsByTag[tag] = {
                     statuses: {},
@@ -1513,95 +1352,95 @@ function calculateAndRenderAnalytics() {
             effortsByTag[tag].subTotals.build += build;
             effortsByTag[tag].subTotals.test += test;
             effortsByTag[tag].subTotals.total += item.total_effort;
-            effortsByTag[tag].subTotals.itemCount++; // This will count unique items per tag correctly
+            // Item count for sub-totals should be handled carefully if items have multiple tags
+            // This simple increment might double-count. For now, this logic is kept from the original.
+            effortsByTag[tag].subTotals.itemCount++; 
         });
     });
 
-    let tableHTML = `
-        <table>
-            <thead>
-                <tr>
-                    <th>Tag / Status</th>
-                    <th>Items</th>
-                    <th>Design Effort</th>
-                    <th>Build Effort</th>
-                    <th>Test Effort</th>
-                    <th>Total Effort</th>
-                </tr>
-            </thead>
-            <tbody>
-    `;
+    analyticsContent.innerHTML = ''; // Clear previous content
+
+    const chartContainer = document.createElement('div');
+    chartContainer.className = 'analytics-chart-container';
 
     const sortedTags = Object.keys(effortsByTag).sort();
 
     sortedTags.forEach(tag => {
         const tagData = effortsByTag[tag];
-        tableHTML += `
-            <tr class="tag-group-header">
-                <td colspan="6"><strong>Tag: ${tag}</strong></td>
-            </tr>
-        `;
+        const totalEffortForTag = tagData.subTotals.total;
+
+        if (totalEffortForTag === 0) return; // Don't render a chart for tags with no effort
+
+        const chartRow = document.createElement('div');
+        chartRow.className = 'chart-row';
+
+        const tagName = document.createElement('div');
+        tagName.className = 'chart-tag-label';
+        tagName.textContent = tag;
+        chartRow.appendChild(tagName);
+
+        const barWrapper = document.createElement('div');
+        barWrapper.className = 'chart-bar-wrapper';
+
+        const bar = document.createElement('div');
+        bar.className = 'chart-bar';
 
         statusOrder.forEach(statusKey => {
             const statusData = tagData.statuses[statusKey];
-            const displayStatus = statusKey.charAt(0).toUpperCase() + statusKey.slice(1).replace(/_/g, ' ');
-            const bgColor = statusColors[statusKey] || '#ffffff'; // Fallback to white if status not in map
+            if (statusData && statusData.total > 0) {
+                const percentage = (totalEffortForTag > 0) ? (statusData.total / totalEffortForTag) * 100 : 0;
+                
+                const segment = document.createElement('div');
+                segment.className = 'chart-bar-segment';
+                segment.style.width = `${percentage}%`;
+                
+                const bgColor = statusColors[statusKey] || '#ccc';
+                segment.style.backgroundColor = bgColor;
+                segment.style.color = getTextColorForBackground(bgColor);
 
-            if (statusData && statusData.itemCount > 0) {
-                tableHTML += `
-                    <tr class="status-row" style="background-color: ${bgColor};">
-                        <td style="padding-left: 25px;">${displayStatus}</td>
-                        <td class="effort-value">${statusData.itemCount}</td>
-                        <td class="effort-value">${statusData.design.toFixed(1)}</td>
-                        <td class="effort-value">${statusData.build.toFixed(1)}</td>
-                        <td class="effort-value">${statusData.test.toFixed(1)}</td>
-                        <td class="effort-value"><strong>${statusData.total.toFixed(1)}</strong></td>
-                    </tr>
-                `;
-            } else {
-                // Render row with 0s if no items for this status under this tag
-                tableHTML += `
-                    <tr class="status-row zero-value-row" style="background-color: ${bgColor};">
-                        <td style="padding-left: 25px;">${displayStatus}</td>
-                        <td class="effort-value">0</td>
-                        <td class="effort-value">0.0</td>
-                        <td class="effort-value">0.0</td>
-                        <td class="effort-value">0.0</td>
-                        <td class="effort-value"><strong>0.0</strong></td>
-                    </tr>
-                `;
+                segment.title = `${statusKey.replace(/_/g, ' ')}: ${statusData.total.toFixed(1)} effort (${percentage.toFixed(1)}%)`;
+
+                // Add text to the segment if it's wide enough
+                if (percentage > 8) { // Threshold to prevent text overflow
+                    segment.textContent = `${statusData.total.toFixed(1)} (${percentage.toFixed(0)}%)`;
+                }
+
+                bar.appendChild(segment);
             }
         });
-        
-        // Tag Sub-total Row
-        tableHTML += `
-            <tr class="tag-subtotal-row">
-                <td style="padding-left: 15px;"><em>Subtotal for ${tag}</em></td>
-                <td class="effort-value"><em>${tagData.subTotals.itemCount}</em></td>
-                <td class="effort-value"><em>${tagData.subTotals.design.toFixed(1)}</em></td>
-                <td class="effort-value"><em>${tagData.subTotals.build.toFixed(1)}</em></td>
-                <td class="effort-value"><em>${tagData.subTotals.test.toFixed(1)}</em></td>
-                <td class="effort-value"><strong><em>${tagData.subTotals.total.toFixed(1)}</em></strong></td>
-            </tr>
-        `;
+
+        barWrapper.appendChild(bar);
+        chartRow.appendChild(barWrapper);
+
+        const totalLabel = document.createElement('div');
+        totalLabel.className = 'chart-total-label';
+        totalLabel.textContent = totalEffortForTag.toFixed(1);
+        chartRow.appendChild(totalLabel);
+
+        chartContainer.appendChild(chartRow);
     });
 
-    tableHTML += `
-            </tbody>
-            <tfoot>
-                <tr class="total-row">
-                    <td><strong>Grand Total (All Items)</strong></td>
-                    <td class="effort-value"><strong>${grandTotals.itemCount}</strong></td>
-                    <td class="effort-value"><strong>${grandTotals.design.toFixed(1)}</strong></td>
-                    <td class="effort-value"><strong>${grandTotals.build.toFixed(1)}</strong></td>
-                    <td class="effort-value"><strong>${grandTotals.test.toFixed(1)}</strong></td>
-                    <td class="effort-value"><strong>${grandTotals.total.toFixed(1)}</strong></td>
-                </tr>
-            </tfoot>
-        </table>
-    `;
+    // Add a legend
+    const legend = document.createElement('div');
+    legend.className = 'chart-legend';
+    statusOrder.forEach(statusKey => {
+        const legendItem = document.createElement('div');
+        legendItem.className = 'legend-item';
+        
+        const colorBox = document.createElement('span');
+        colorBox.className = 'legend-color-box';
+        colorBox.style.backgroundColor = statusColors[statusKey];
+        
+        const statusLabel = document.createElement('span');
+        statusLabel.textContent = statusKey.replace(/_/g, ' ');
 
-    analyticsContent.innerHTML = tableHTML;
+        legendItem.appendChild(colorBox);
+        legendItem.appendChild(statusLabel);
+        legend.appendChild(legendItem);
+    });
+    
+    analyticsContent.appendChild(legend);
+    analyticsContent.appendChild(chartContainer);
 }
 
 /**
@@ -1614,6 +1453,7 @@ function rebuildAllUniqueTagsAndRefreshFilters() {
     allUniqueTags.clear();
     // Reset color mapping to ensure consistency if prefixes change
     tagPrefixColorMap = {};
+    tagColorMap = {};
     nextColorIndex = 0;
 
     jsonData.items.forEach(item => {
@@ -1651,6 +1491,29 @@ function rebuildAllUniqueTagsAndRefreshFilters() {
  */
 document.addEventListener('DOMContentLoaded', () => {
     filterContainer = document.getElementById('filterTagsContainer');
-    // Any initial rendering that depends on filterContainer being present can go here
-    // or be triggered after file load, which is current behavior.
+    
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+
+    tabButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            // Deactivate all
+            tabButtons.forEach(btn => btn.classList.remove('active'));
+            tabContents.forEach(content => content.classList.remove('active'));
+
+            // Activate clicked
+            button.classList.add('active');
+            const tabId = button.getAttribute('data-tab');
+            document.getElementById(tabId).classList.add('active');
+
+            // If switching to the plan tab, redraw arrows
+            if (tabId === 'planTab') {
+                requestAnimationFrame(() => {
+                    if (jsonData) {
+                        drawDependencyArrows(getFilteredDataForArrows());
+                    }
+                });
+            }
+        });
+    });
 }); 
