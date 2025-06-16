@@ -3,11 +3,18 @@
 // Global variable to hold the todo items
 let todoData = [];
 let currentEditingTodoId = null;
+
+// --- State Management ---
 let filterKeyword = '';
+let activeTypeFilters = new Set();
+let activeStatusFilters = new Set();
 let sortState = {
     column: 'ID',
     direction: 'asc'
 };
+
+const TODO_TYPES = ['Action', 'Information', 'Issue', 'Other', 'Question', 'Risk'];
+const TODO_STATUSES = ['Not Started', 'Open', 'In Progress', 'Done', 'Closed'];
 
 // DOM Elements
 const todoTableContainer = document.getElementById('todoTableContainer');
@@ -19,6 +26,9 @@ const todoItemIdInput = document.getElementById('todoItemId'); // Hidden input
 const saveTodoItemButton = document.getElementById('saveTodoItemButton');
 const todoFilterInput = document.getElementById('todoFilterInput');
 
+// Initialize filter sets to include all options by default
+activeTypeFilters = new Set(TODO_TYPES);
+activeStatusFilters = new Set(TODO_STATUSES);
 
 /**
  * Initializes the todo module with data.
@@ -46,16 +56,24 @@ function renderTodoTable() {
     if (!todoTableContainer) return;
 
     // 1. Filter data
-    let dataToRender = [...todoData];
-    if (filterKeyword) {
-        const lowercasedFilter = filterKeyword.toLowerCase();
-        dataToRender = dataToRender.filter(item => {
-            // Check against all relevant fields
+    let dataToRender = todoData.filter(item => {
+        // Checkbox filters first for efficiency
+        const typeMatch = activeTypeFilters.has(item.Type || 'Other');
+        const statusMatch = activeStatusFilters.has(item.Status || 'Not Started');
+        if (!typeMatch || !statusMatch) {
+            return false;
+        }
+
+        // Then, apply text filter only if there's a keyword
+        if (filterKeyword) {
+            const lowercasedFilter = filterKeyword.toLowerCase();
             return Object.values(item).some(value => 
                 String(value).toLowerCase().includes(lowercasedFilter)
             );
-        });
-    }
+        }
+
+        return true; // Pass if checkbox filters match and there's no text filter
+    });
 
     // 2. Sort data
     dataToRender.sort((a, b) => {
@@ -113,8 +131,10 @@ function renderTodoTable() {
                 });
             }
 
+            const itemTypeClass = item.Type ? `todo-type-${item.Type.toLowerCase().replace(/\s+/g, '-')}` : '';
+
             tableHtml += `
-                <tr data-id="${item.ID}">
+                <tr data-id="${item.ID}" class="${itemTypeClass}">
                     <td class="col-id">${item.ID}</td>
                     <td class="col-type">${item.Type || ''}</td>
                     <td class="col-title">${item.Title || ''}</td>
@@ -139,7 +159,9 @@ function renderTodoTable() {
             <td class="col-type">
                 <select id="new-todo-type" class="inline-todo-input">
                     <option value="Action">Action</option>
+                    <option value="Information">Information</option>
                     <option value="Issue">Issue</option>
+                    <option value="Other">Other</option>
                     <option value="Question">Question</option>
                     <option value="Risk">Risk</option>
                 </select>
@@ -347,8 +369,72 @@ function saveNewTodoFromInlineRow() {
     renderTodoTable(); // Re-render to show new item and a fresh input row
 }
 
+/**
+ * Renders the filter controls (checkboxes) for Type and Status.
+ */
+function renderTodoFilterControls() {
+    const typeContainer = document.getElementById('todoTypeFilterContainer');
+    const statusContainer = document.getElementById('todoStatusFilterContainer');
+
+    if (!typeContainer || !statusContainer) return;
+
+    // --- Render Type Filters ---
+    let typeHtml = '<h4>Type</h4><div class="filter-items-container">';
+    TODO_TYPES.forEach(type => {
+        const isChecked = activeTypeFilters.has(type);
+        typeHtml += `
+            <label class="filter-item-label">
+                <input type="checkbox" class="todo-type-filter" value="${type}" ${isChecked ? 'checked' : ''}>
+                ${type}
+            </label>
+        `;
+    });
+    typeHtml += '</div>';
+    typeContainer.innerHTML = typeHtml;
+
+    // --- Render Status Filters ---
+    let statusHtml = '<h4>Status</h4><div class="filter-items-container">';
+    TODO_STATUSES.forEach(status => {
+        const isChecked = activeStatusFilters.has(status);
+        statusHtml += `
+            <label class="filter-item-label">
+                <input type="checkbox" class="todo-status-filter" value="${status}" ${isChecked ? 'checked' : ''}>
+                ${status}
+            </label>
+        `;
+    });
+    statusHtml += '</div>';
+    statusContainer.innerHTML = statusHtml;
+
+    // --- Add Event Listeners ---
+    typeContainer.querySelectorAll('.todo-type-filter').forEach(checkbox => {
+        checkbox.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                activeTypeFilters.add(e.target.value);
+            } else {
+                activeTypeFilters.delete(e.target.value);
+            }
+            renderTodoTable();
+        });
+    });
+
+    statusContainer.querySelectorAll('.todo-status-filter').forEach(checkbox => {
+        checkbox.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                activeStatusFilters.add(e.target.value);
+            } else {
+                activeStatusFilters.delete(e.target.value);
+            }
+            renderTodoTable();
+        });
+    });
+}
+
 // --- Event Listeners ---
 document.addEventListener('DOMContentLoaded', () => {
+    // Initial render of controls
+    renderTodoFilterControls();
+
     if (addTodoItemButton) {
         addTodoItemButton.addEventListener('click', openAddTodoModal);
     }

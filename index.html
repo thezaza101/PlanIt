@@ -67,7 +67,13 @@
         <div class="todo-header">
             <h2>Todo List</h2>
             <div class="todo-controls">
-                <input type="text" id="todoFilterInput" placeholder="Filter table...">
+                <input type="text" id="todoFilterInput" placeholder="Filter by keyword...">
+                <div id="todoTypeFilterContainer" class="todo-filter-group">
+                    <!-- Type filters will be rendered here by JavaScript -->
+                </div>
+                <div id="todoStatusFilterContainer" class="todo-filter-group">
+                    <!-- Status filters will be rendered here by JavaScript -->
+                </div>
             </div>
             <button id="addTodoItemButton" class="btn">+ Add Todo Item</button>
         </div>
@@ -175,7 +181,9 @@
                         <label for="todoItemType">Type:</label>
                         <select id="todoItemType" name="type" required>
                             <option value="Action">Action</option>
+                            <option value="Information">Information</option>
                             <option value="Issue">Issue</option>
+                            <option value="Other">Other</option>
                             <option value="Question">Question</option>
                             <option value="Risk">Risk</option>
                         </select>

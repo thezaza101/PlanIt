@@ -1201,8 +1201,43 @@ label { /* From original full set, ensure it's present if it was global */
 
 .todo-controls {
     flex-grow: 1;
-    text-align: center;
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    align-items: center;
     margin: 0 20px;
+}
+
+.todo-filter-group {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.filter-items-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px; /* Adjust gap between checkboxes */
+    align-items: center;
+}
+
+.todo-filter-group h4 {
+    margin: 0 0 8px 0;
+    font-size: 1em;
+    font-weight: 600;
+    color: #343a40;
+    cursor: pointer;
+    margin-bottom: 0; /* Was 4px, no longer needed with flex gap */
+}
+
+.todo-filter-group .filter-item-label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.9em;
+    color: #495057;
+    cursor: pointer;
+    margin-bottom: 4px;
 }
 
 #todoFilterInput {
@@ -1332,6 +1367,24 @@ label { /* From original full set, ensure it's present if it was global */
 #todoTableContainer th.sorted-desc::after {
     content: ' \\2193'; /* Down arrow */
     opacity: 1;
+}
+
+/* Row coloring based on type */
+#todoTableContainer .todo-type-risk { background-color: #ffebee; }
+#todoTableContainer .todo-type-issue { background-color: #fff3e0; }
+#todoTableContainer .todo-type-action { background-color: #e3f2fd; }
+#todoTableContainer .todo-type-question { background-color: #fce4ec; }
+#todoTableContainer .todo-type-information { background-color: #e8f5e9; }
+#todoTableContainer .todo-type-other { background-color: #f3e5f5; }
+
+#todoTableContainer tbody tr:not(#new-todo-row):hover {
+    filter: brightness(0.95);
+    transition: filter 0.2s ease-in-out;
+}
+
+#todoTableContainer td .todo-actions {
+    display: flex;
+    gap: 10px;
 }
 
 /* --- End Todo Tab Styles --- */ 
