@@ -67,11 +67,16 @@ fileInput.addEventListener('change', function(event) {
                 const todoSheet = workbook.Sheets['Todo'];
                 const todos = todoSheet ? XLSX.utils.sheet_to_json(todoSheet) : [];
 
+                // 4. Get "Detail" (optional)
+                const detailSheet = workbook.Sheets['detail'];
+                const details = detailSheet ? XLSX.utils.sheet_to_json(detailSheet) : [];
+
                 jsonData = {
                     link_base: link_base,
                     buckets: buckets,
                     items: items,
-                    todos: todos // Add todos to the main data object
+                    todos: todos, // Add todos to the main data object
+                    details: details // Add details to the main data object
                 };
                 
                 processJsonData(); // Use the same processing logic
@@ -133,6 +138,11 @@ function processJsonData() {
         initializeTodo(jsonData.todos || []);
     }
 
+    // Pass detail data to a new initializer in todo_detail.js if it exists
+    if (typeof initializeDetails === 'function') {
+        initializeDetails(jsonData.details || []);
+    }
+
     // Redraw arrows after a short delay to ensure DOM is updated
     requestAnimationFrame(() => {
         if (typeof getFilteredDataForArrows === 'function') {
@@ -152,6 +162,20 @@ function handleFileLoadError(message) {
     arrowCanvas.innerHTML = '';
     jsonData = null;
     itemBucketSelect.innerHTML = '';
+}
+
+/**
+ * Provides access to data from a specific sheet.
+ * @param {string} sheetName - The name of the sheet to get data for (e.g., 'todo', 'detail').
+ * @returns {Array|undefined} The array of data objects for that sheet.
+ */
+function getSheetData(sheetName) {
+    if (!jsonData) return undefined;
+    
+    // Simple mapping from singular name to plural key in jsonData
+    const key = sheetName.toLowerCase() === 'todo' ? 'todos' : `${sheetName.toLowerCase()}s`;
+
+    return jsonData[key];
 }
 
 /**
@@ -241,19 +265,31 @@ saveAsExcelButton.addEventListener('click', function() {
             }
         }
 
-        // 4. Create Workbook and download
+        // 4. Create 'detail' sheet if data exists
+        let wsDetail = null;
+        if (typeof getDetailData === 'function') {
+            const detailData = getDetailData();
+            if (detailData && detailData.length > 0) {
+                wsDetail = XLSX.utils.json_to_sheet(detailData);
+            }
+        }
+
+        // 5. Create Workbook and add all sheets
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, wsSettings, "SETTINGS");
         XLSX.utils.book_append_sheet(wb, wsItems, "Work Items");
         if (wsTodo) {
             XLSX.utils.book_append_sheet(wb, wsTodo, "Todo");
         }
+        if (wsDetail) {
+            XLSX.utils.book_append_sheet(wb, wsDetail, "detail");
+        }
         
-        const excelFileName = originalFileName.replace(/(\.json|\.xlsx)$/, '.xlsx');
-        XLSX.writeFile(wb, excelFileName);
+        // 6. Download the workbook
+        const newFileName = originalFileName.replace(/(\.json|\.xlsx)$/, '_edited.xlsx');
+        XLSX.writeFile(wb, newFileName);
 
     } catch (error) {
-        alert('An error occurred while creating the Excel file: ' + error.message);
-        console.error(error);
+        alert('Error saving Excel file: ' + error.message);
     }
 }); 

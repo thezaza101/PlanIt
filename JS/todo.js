@@ -216,6 +216,23 @@ function renderTodoTable() {
         });
     });
 
+    // Add click listeners to title cells to open graph view
+    const titleCells = todoTableContainer.querySelectorAll('td.col-title');
+    titleCells.forEach(cell => {
+        const row = cell.closest('tr');
+        if (!row || row.id === 'new-todo-row' || !row.dataset.id) return; // Skip the 'add new' row and header
+        
+        const todoId = parseInt(row.dataset.id, 10);
+        
+        // Clear any existing listeners to avoid duplicates
+        const newCell = cell.cloneNode(true);
+        cell.parentNode.replaceChild(newCell, cell);
+
+        newCell.style.cursor = 'pointer';
+        newCell.style.textDecoration = 'underline';
+        newCell.addEventListener('click', () => showGraphViewForTodo(todoId));
+    });
+
     if (todoItemModal) {
         todoItemModal.style.display = 'none';
     }
@@ -337,15 +354,42 @@ function handleTodoFormSubmit(event) {
 }
 
 /**
+ * Shows the graph view for a specific todo item.
+ * @param {number} todoId The ID of the todo item to display.
+ */
+function showGraphViewForTodo(todoId) {
+    const graphContainer = document.getElementById('graph-view-container');
+    const todo = todoData.find(item => item.ID === todoId);
+    if (!todo || !graphContainer) return;
+
+    console.log(`Showing graph for Todo ID: ${todoId}`, todo);
+
+    // Make the container visible
+    graphContainer.style.display = 'block';
+
+    // Scroll to the graph view
+    graphContainer.scrollIntoView({ behavior: 'smooth' });
+
+    // Call the function from todo_detail.js to render the graph
+    if (typeof renderGraph === 'function') {
+        renderGraph(todo);
+    } else {
+        console.error('renderGraph function not found. Is todo_detail.js loaded?');
+    }
+}
+
+/**
  * Saves a new todo item from the inline table row.
  */
 function saveNewTodoFromInlineRow() {
-    const title = document.getElementById('new-todo-title').value.trim();
+    const titleInput = document.getElementById('new-todo-title');
+    const descriptionInput = document.getElementById('new-todo-description');
+    const title = titleInput.value.trim();
     if (!title) {
         alert('Title is required to add a new item.');
         return;
     }
-    const description = document.getElementById('new-todo-description').value.trim();
+    const description = descriptionInput.value.trim();
     const tags = document.getElementById('new-todo-tags').value.trim();
 
     const today = new Date().toISOString().split('T')[0];
@@ -430,16 +474,10 @@ function renderTodoFilterControls() {
     });
 }
 
-// --- Event Listeners ---
+// --- DOMContentLoaded ---
 document.addEventListener('DOMContentLoaded', () => {
-    // Initial render of controls
-    renderTodoFilterControls();
-
     if (addTodoItemButton) {
         addTodoItemButton.addEventListener('click', openAddTodoModal);
-    }
-    if (todoItemForm) {
-        todoItemForm.addEventListener('submit', handleTodoFormSubmit);
     }
     if (todoFilterInput) {
         todoFilterInput.addEventListener('input', (e) => {
@@ -447,11 +485,28 @@ document.addEventListener('DOMContentLoaded', () => {
             renderTodoTable();
         });
     }
+    if (todoItemForm) {
+        todoItemForm.addEventListener('submit', handleTodoFormSubmit);
+    }
 
-    // Add listener for clicks outside the modal to close it
-    window.addEventListener('click', function(event) {
-        if (event.target == todoItemModal) {
-            closeTodoModal();
-        }
-    });
+    // Initialize filter controls
+    renderTodoFilterControls();
+
+    // Collapsible Todo Section Logic
+    const todoToggle = document.getElementById('todoToggle');
+    const todoToggleIndicator = document.getElementById('todoToggleIndicator');
+    const todoContent = document.getElementById('todoContent');
+
+    if (todoToggle && todoToggleIndicator && todoContent) {
+        // Initialize state from localStorage
+        const isTodoCollapsed = localStorage.getItem('todoCollapsed') === 'true';
+        todoContent.classList.toggle('collapsed', isTodoCollapsed);
+        todoToggleIndicator.textContent = isTodoCollapsed ? '(Show)' : '(Hide)';
+
+        todoToggle.addEventListener('click', () => {
+            const isCollapsed = todoContent.classList.toggle('collapsed');
+            localStorage.setItem('todoCollapsed', isCollapsed);
+            todoToggleIndicator.textContent = isCollapsed ? '(Show)' : '(Hide)';
+        });
+    }
 }); 

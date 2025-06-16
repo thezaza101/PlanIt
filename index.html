@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JSON Editor</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="CSS/todo_detail.css">
 </head>
 <body>
     <h1>Local JSON File Reader/Editor</h1>
@@ -63,22 +64,36 @@
     </div>
 
     <div id="todoTab" class="tab-content">
-        <!-- Content for the Todo tab will go here -->
-        <div class="todo-header">
-            <h2>Todo List</h2>
-            <div class="todo-controls">
-                <input type="text" id="todoFilterInput" placeholder="Filter by keyword...">
-                <div id="todoTypeFilterContainer" class="todo-filter-group">
-                    <!-- Type filters will be rendered here by JavaScript -->
+        <div id="todoSection">
+            <h2 id="todoToggle">
+                Todo List <span id="todoToggleIndicator">(Hide)</span>
+            </h2>
+            <div id="todoContent">
+                <!-- Content for the Todo tab will go here -->
+                <div class="todo-header">
+                    <h2>Todo List</h2>
+                    <div class="todo-controls">
+                        <input type="text" id="todoFilterInput" placeholder="Filter by keyword...">
+                        <div id="todoTypeFilterContainer" class="todo-filter-group">
+                            <!-- Type filters will be rendered here by JavaScript -->
+                        </div>
+                        <div id="todoStatusFilterContainer" class="todo-filter-group">
+                            <!-- Status filters will be rendered here by JavaScript -->
+                        </div>
+                    </div>
+                    <button id="addTodoItemButton" class="btn">+ Add Todo Item</button>
                 </div>
-                <div id="todoStatusFilterContainer" class="todo-filter-group">
-                    <!-- Status filters will be rendered here by JavaScript -->
+                <div id="todoTableContainer">
+                    <!-- Todo table will be rendered here by JavaScript -->
                 </div>
             </div>
-            <button id="addTodoItemButton" class="btn">+ Add Todo Item</button>
         </div>
-        <div id="todoTableContainer">
-            <!-- Todo table will be rendered here by JavaScript -->
+        <div id="graph-view-container">
+            <h3>Graph View</h3>
+            <canvas id="graph-canvas"></canvas>
+            <div id="graph-controls">
+                <button id="addCardButton">Add Card</button>
+            </div>
         </div>
     </div>
 
@@ -225,9 +240,43 @@
         </div>
     </div>
 
+    <!-- Card Edit Modal for Graph View -->
+    <div id="cardEditModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeCardEditModal()">&times;</span>
+            <h2>Edit Card</h2>
+            <form id="cardEditForm">
+                <input type="hidden" id="editCardId">
+                <label for="editCardContent">Content:</label>
+                <textarea id="editCardContent" required></textarea>
+                <label for="editCardType">Type:</label>
+                <select id="editCardType">
+                    <option value="Information">Information</option>
+                    <option value="Process">Process</option>
+                    <option value="Follow Up">Follow Up</option>
+                    <option value="Other">Other</option>
+                </select>
+                <label for="editCardStatus">Status:</label>
+                <select id="editCardStatus">
+                    <option value="New">New</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Done">Done</option>
+                </select>
+                <div class="modal-buttons">
+                    <button type="button" id="deleteCardButton" class="item-btn-delete">Delete</button>
+                    <div style="flex-grow: 1;"></div>
+                    <button type="button" onclick="closeCardEditModal()">Cancel</button>
+                    <button type="button" id="addChildCardButton">Add Child</button>
+                    <button type="submit">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script src="JS/xlsx.full.min.js"></script>
     <script src="JS/io.js" defer></script>
     <script src="JS/app.js" defer></script>
     <script src="JS/todo.js" defer></script>
+    <script src="JS/todo_detail.js" defer></script>
 </body>
 </html>

@@ -1,0 +1,25 @@
+/* This file will contain the styles for the new Graph View feature. */
+
+#graph-view-container {
+    display: none; /* Initially hidden */
+    margin-top: 20px;
+    border: 1px solid #ccc;
+    padding: 10px;
+    background: #f7fafd;
+    /* Let JS handle height, remove fixed height properties */
+    display: flex;
+    flex-direction: column;
+}
+
+#graph-canvas {
+    border: 1px solid #000;
+    width: 100%;
+    /* Height is now set by JS */
+    display: block;
+    background: #fff;
+    box-sizing: border-box;
+}
+
+@media (max-width: 900px) {
+    /* Media query can remain for other properties if needed, but height is now dynamic */
+} 
