@@ -1,5 +1,4 @@
 const fileInput = document.getElementById('fileInput');
-const saveButton = document.getElementById('saveButton');
 const saveAsExcelButton = document.getElementById('saveAsExcelButton');
 const fileNameHeader = document.getElementById('fileNameHeader');
 
@@ -13,13 +12,6 @@ fileInput.addEventListener('change', function(event) {
         return;
     }
     originalFileName = file.name;
-    
-    // Display the file name in the header
-    if (fileNameHeader) {
-        const nameWithoutExtension = originalFileName.replace(/\.(json|xlsx)$/i, '');
-        fileNameHeader.textContent = nameWithoutExtension;
-    }
-
     const reader = new FileReader();
 
     if (file.name.endsWith('.json')) {
@@ -189,9 +181,6 @@ function handleFileLoadError(message) {
     arrowCanvas.innerHTML = '';
     window.jsonData = null;
     itemBucketSelect.innerHTML = '';
-    if (fileNameHeader) {
-        fileNameHeader.textContent = '';
-    }
 }
 
 /**
@@ -212,27 +201,14 @@ function getSheetData(sheetName) {
  * Handles the click event for the save button.
  * Converts the content of the JSON display textarea to a Blob and initiates a download.
  */
-saveButton.addEventListener('click', function() {
-    if (!window.jsonData) {
-        alert("No data to save.");
-        return;
-    }
-    try {
-        // Ensure the data is up-to-date from the textarea
-        const jsonString = JSON.stringify(window.jsonData, null, 4);
-        const blob = new Blob([jsonString], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = originalFileName.replace(/(\.json|\.xlsx)$/, '_edited.json');
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    } catch (error) {
-        alert('Error saving JSON. Please ensure the content in the text area is valid JSON.\n' + error.message);
-    }
-});
+function getSheetData(sheetName) {
+    if (!window.jsonData) return undefined;
+    
+    // Simple mapping from singular name to plural key in jsonData
+    const key = sheetName.toLowerCase() === 'todo' ? 'todos' : `${sheetName.toLowerCase()}s`;
+
+    return window.jsonData[key];
+}
 
 saveAsExcelButton.addEventListener('click', function() {
     if (!window.jsonData) {
