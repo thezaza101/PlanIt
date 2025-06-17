@@ -12,6 +12,8 @@ let sortState = {
     column: 'ID',
     direction: 'asc'
 };
+let currentPage = 1;
+const ITEMS_PER_PAGE = 10;
 
 const TODO_TYPES = ['Action', 'Information', 'Issue', 'Other', 'Question', 'Risk'];
 const TODO_STATUSES = ['Not Started', 'Open', 'In Progress', 'Done', 'Closed'];
@@ -93,6 +95,17 @@ function renderTodoTable() {
         return String(valA).toLowerCase().localeCompare(String(valB).toLowerCase()) * dir;
     });
 
+    const totalItems = dataToRender.length;
+    const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+    if (currentPage > totalPages) {
+        currentPage = totalPages || 1;
+    }
+
+    // 3. Paginate data
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    const paginatedData = dataToRender.slice(startIndex, endIndex);
+
     const nextId = todoData.reduce((max, item) => item.ID > max ? item.ID : max, 0) + 1;
 
     let tableHtml = `
@@ -113,10 +126,10 @@ function renderTodoTable() {
             <tbody>
     `;
 
-    if (dataToRender.length === 0) {
-        tableHtml += '<tr><td colspan="9" style="text-align:center; color: #777;">No items match the filter.</td></tr>';
+    if (paginatedData.length === 0) {
+        tableHtml += '<tr><td colspan="9" style="text-align:center; color: #777;">No items match the current filters.</td></tr>';
     } else {
-        dataToRender.forEach(item => {
+        paginatedData.forEach(item => {
             let tagsHtml = '';
             if (item.Tags && typeof item.Tags === 'string' && item.Tags.trim() !== '') {
                 const tags = item.Tags.split(',').map(t => t.trim());
@@ -193,6 +206,8 @@ function renderTodoTable() {
 
     todoTableContainer.innerHTML = tableHtml;
 
+    renderPaginationControls(totalPages);
+
     // Add sorting classes to headers
     const headers = todoTableContainer.querySelectorAll('th.sortable');
     headers.forEach(header => {
@@ -236,6 +251,64 @@ function renderTodoTable() {
     if (todoItemModal) {
         todoItemModal.style.display = 'none';
     }
+}
+
+function renderPaginationControls(totalPages) {
+    const container = document.getElementById('todoPaginationContainer');
+    if (!container) return;
+    
+    if (totalPages <= 1) {
+        container.innerHTML = '';
+        return;
+    }
+
+    let paginationHtml = '';
+
+    // Previous Button
+    paginationHtml += `<button id="prevPageBtn" ${currentPage === 1 ? 'disabled' : ''}>&laquo; Previous</button>`;
+
+    // Page Numbers
+    for (let i = 1; i <= totalPages; i++) {
+        if (i === currentPage) {
+            paginationHtml += `<span class="page-number active">${i}</span>`;
+        } else {
+            // In a real app with many pages, you'd add logic here for "..."
+            paginationHtml += `<button class="page-number-btn" data-page="${i}">${i}</button>`;
+        }
+    }
+
+    // Next Button
+    paginationHtml += `<button id="nextPageBtn" ${currentPage === totalPages ? 'disabled' : ''}>Next &raquo;</button>`;
+
+    container.innerHTML = paginationHtml;
+
+    // --- Add Event Listeners ---
+    const prevBtn = document.getElementById('prevPageBtn');
+    if (prevBtn) {
+        prevBtn.addEventListener('click', () => {
+            if (currentPage > 1) {
+                currentPage--;
+                renderTodoTable();
+            }
+        });
+    }
+
+    const nextBtn = document.getElementById('nextPageBtn');
+    if (nextBtn) {
+        nextBtn.addEventListener('click', () => {
+            if (currentPage < totalPages) {
+                currentPage++;
+                renderTodoTable();
+            }
+        });
+    }
+
+    container.querySelectorAll('.page-number-btn').forEach(button => {
+        button.addEventListener('click', () => {
+            currentPage = Number(button.dataset.page);
+            renderTodoTable();
+        });
+    });
 }
 
 /**
@@ -458,6 +531,7 @@ function renderTodoFilterControls() {
             } else {
                 activeTypeFilters.delete(e.target.value);
             }
+            currentPage = 1; // Reset to first page
             renderTodoTable();
         });
     });
@@ -469,9 +543,16 @@ function renderTodoFilterControls() {
             } else {
                 activeStatusFilters.delete(e.target.value);
             }
+            currentPage = 1; // Reset to first page
             renderTodoTable();
         });
     });
+}
+
+function handleTodoFilterChange() {
+    filterKeyword = todoFilterInput.value;
+    currentPage = 1; // Reset to first page when filter changes
+    renderTodoTable();
 }
 
 // --- DOMContentLoaded ---
@@ -480,10 +561,7 @@ document.addEventListener('DOMContentLoaded', () => {
         addTodoItemButton.addEventListener('click', openAddTodoModal);
     }
     if (todoFilterInput) {
-        todoFilterInput.addEventListener('input', (e) => {
-            filterKeyword = e.target.value;
-            renderTodoTable();
-        });
+        todoFilterInput.addEventListener('input', handleTodoFilterChange);
     }
     if (todoItemForm) {
         todoItemForm.addEventListener('submit', handleTodoFormSubmit);

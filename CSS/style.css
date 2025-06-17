@@ -25,13 +25,9 @@ body {
 }
 
 .main-controls-container {
-    padding: 15px 25px;
-    background-color: #fff;
-    border-bottom: 1px solid #e0e0e0;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 15px;
-    align-items: center;
+    padding: 0;
+    border-bottom: none;
+    background-color: transparent;
 }
 
 .control-group {
@@ -629,15 +625,14 @@ label { /* From original full set, ensure it's present if it was global */
 }
 
 .modal-content {
-    background-color: #fff;
-    margin: 8% auto;
-    padding: 25px 30px;
-    border: none;
-    width: 90%;
-    max-width: 550px;
+    background-color: #fefefe;
+    margin: 5% auto; /* Responsive margin */
+    padding: 20px;
+    border: 1px solid #888;
+    width: 80%; /* Could be more or less, depending on screen size */
+    max-width: 700px;
     border-radius: 8px;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-    position: relative;
+    box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2),0 6px 20px 0 rgba(0,0,0,0.19);
 }
 
 .modal-content h2 {
@@ -706,10 +701,10 @@ label { /* From original full set, ensure it's present if it was global */
 }
 
 .close-btn {
+    color: #aaa;
     position: absolute;
     top: 15px;
     right: 20px;
-    color: #888;
     font-size: 2em;
     font-weight: bold;
     line-height: 1;
@@ -1156,13 +1151,13 @@ label { /* From original full set, ensure it's present if it was global */
 /* --- Tab Navigation Styles --- */
 .tab-navigation {
     display: flex;
-    background-color: #e9ecef;
-    border-bottom: 1px solid #dee2e6;
-    padding: 0 25px;
+    background-color: transparent;
+    border-bottom: none;
+    padding: 0;
 }
 
 .tab-btn {
-    padding: 12px 20px;
+    padding: 15px 20px;
     cursor: pointer;
     border: none;
     background-color: transparent;
@@ -1394,3 +1389,88 @@ label { /* From original full set, ensure it's present if it was global */
 }
 
 /* --- End Todo Tab Styles --- */ 
+
+/* Pagination Styles */
+#todoPaginationContainer {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 15px 0;
+}
+
+#todoPaginationContainer button {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    color: #007bff;
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+#todoPaginationContainer button:hover {
+    background-color: #e9ecef;
+}
+
+#todoPaginationContainer button:disabled {
+    color: #6c757d;
+    cursor: not-allowed;
+    background-color: #f8f9fa;
+}
+
+#todoPaginationContainer .page-number {
+    padding: 8px 12px;
+    margin: 0 4px;
+    border: 1px solid #dee2e6;
+    background-color: #fff;
+}
+
+#todoPaginationContainer .page-number.active {
+    background-color: #007bff;
+    color: white;
+    border-color: #007bff;
+}
+
+/* New Header Styles */
+.app-header-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 25px;
+    background-color: #fff;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.header-left-panel, .header-right-panel {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+#fileNameHeader {
+    font-size: 1.4em;
+    font-weight: 600;
+    color: #343a40;
+    margin: 0;
+}
+
+.header-right-panel .control-group {
+    /* The label will be styled as a button, hide the default input */
+    position: relative;
+    overflow: hidden;
+    display: inline-block;
+}
+.header-right-panel .file-input-label {
+    /* Style it like other buttons */
+    background-color: #6c757d;
+    color: white;
+    border-color: #6c757d;
+    display: inline-block;
+    padding: 8px 15px;
+}
+.header-right-panel .file-input-label:hover {
+    background-color: #5a6268;
+    border-color: #545b62;
+}
+.header-right-panel input[type="file"] {
+    display: none; /* Hide the default ugly input */
+}

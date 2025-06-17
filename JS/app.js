@@ -54,8 +54,7 @@ const filtersToggleIndicator = document.getElementById('filtersToggleIndicator')
 const allFiltersContainer = document.getElementById('allFiltersContainer');
 
 let originalFileName = 'edited_data.json';
-/** @type {object|null} Stores the parsed JSON data from the loaded file. */
-let jsonData = null;
+// The jsonData object will be a global variable (window.jsonData) managed by io.js
 /** @type {number|null} Stores the original ID of an item being edited. */
 let currentEditingOriginalId = null;
 
@@ -407,11 +406,11 @@ function renderSwimlanes(data) {
  *                   according to the current filter states. If no jsonData is loaded, returns a structure with empty items.
  */
 function getFilteredDataForArrows() {
-    if (!jsonData || !jsonData.items) { 
-        return { items: [], buckets: (jsonData ? jsonData.buckets : []), link_base: (jsonData ? jsonData.link_base : null) };
+    if (!window.jsonData || !window.jsonData.items) { 
+        return { items: [], buckets: (window.jsonData ? window.jsonData.buckets : []), link_base: (window.jsonData ? window.jsonData.link_base : null) };
     }
 
-    let itemsToConsider = jsonData.items;
+    let itemsToConsider = window.jsonData.items;
 
     // Apply Filter B (Focus)
     if (focusTagState.enabled && focusTagState.selectedTag) {
@@ -430,7 +429,7 @@ function getFilteredDataForArrows() {
     });
 
     return {
-        ...jsonData, // Keep other jsonData properties like buckets, link_base
+        ...window.jsonData, // Keep other jsonData properties like buckets, link_base
         items: currentlyDisplayedItems
     };
 }
@@ -495,10 +494,10 @@ function _drawDependencyArrows(data) {
  * and re-populates bucket selectors in modals.
  */
 function refreshDisplayAndData() {
-    if (!jsonData) return;
+    if (!window.jsonData) return;
 
     // 2. Re-render swimlanes (will use activeTagFilters internally)
-    renderSwimlanes(jsonData);
+    renderSwimlanes(window.jsonData);
 
     // 3. Re-draw arrows (renderSwimlanes now calls this with filtered data)
     // requestAnimationFrame(() => {
@@ -519,8 +518,8 @@ function refreshDisplayAndData() {
  */
 function populateBucketSelector() {
     itemBucketSelect.innerHTML = ''; // Clear existing options
-    if (jsonData && jsonData.buckets) {
-        jsonData.buckets.forEach(bucket => {
+    if (window.jsonData && window.jsonData.buckets) {
+        window.jsonData.buckets.forEach(bucket => {
             const option = document.createElement('option');
             option.value = bucket.name;
             option.textContent = bucket.name;
@@ -591,7 +590,9 @@ function openAddModal(bucketName) {
  * @param {number} id - The ID of the item to modify.
  */
 function openModifyModal(id) {
-    const item = jsonData.items.find(i => i.id === id);
+    if (!window.jsonData || !window.jsonData.items) return;
+
+    const item = window.jsonData.items.find(i => i.id === id);
     if (!item) {
         alert('Item not found!');
         return;
@@ -637,36 +638,28 @@ function openModifyModal(id) {
  * @param {number} id - The ID of the item to delete.
  */
 function deleteItem(id) {
-    if (!confirm(`Are you sure you want to delete item ID: ${id}? This will also remove it as a predecessor from other items.`)) {
-        return;
-    }
+    if (!window.jsonData || !window.jsonData.items) return;
 
-    if (jsonData && jsonData.items) {
-        const itemIndex = jsonData.items.findIndex(item => item.id === id);
-        if (itemIndex > -1) {
-            jsonData.items.splice(itemIndex, 1);
+    const itemToDelete = window.jsonData.items.find(i => i.id === id);
+    if (!itemToDelete) return;
 
-            // Also remove this ID from any other item's predecessor list
-            jsonData.items.forEach(item => {
-                if (Array.isArray(item.predecessors)) {
-                    item.predecessors = item.predecessors.filter(predId => predId !== id);
-                    if (item.predecessors.length === 0) {
-                        delete item.predecessors; // Remove empty array
-                    } else if (item.predecessors.length === 1) {
-                        item.predecessors = item.predecessors[0]; // Convert to single value if only one left
-                    }
-                } else if (item.predecessors === id) {
-                    delete item.predecessors;
-                }
-            });
+    const confirmDelete = confirm(`Are you sure you want to delete item "${stripTagsFromName(itemToDelete.name)}"? This will also remove its downstream dependencies.`);
+    if (confirmDelete) {
+        // Find all items that have the deleted item as a predecessor
+        const downstreamItems = window.jsonData.items.filter(i => 
+            i.predecessors && i.predecessors.includes(id)
+        );
 
-            refreshDisplayAndData();
-            rebuildAllUniqueTagsAndRefreshFilters();
-        } else {
-            alert('Item not found for deletion.');
-        }
-    } else {
-        alert('No data loaded to delete from.');
+        // Remove the predecessor link from downstream items
+        downstreamItems.forEach(item => {
+            item.predecessors = item.predecessors.filter(pId => pId !== id);
+        });
+
+        // Remove the item itself
+        window.jsonData.items = window.jsonData.items.filter(i => i.id !== id);
+        
+        // Refresh the display to reflect the deletion and updated dependencies
+        refreshDisplayAndData();
     }
 }
 
@@ -676,7 +669,7 @@ function deleteItem(id) {
  */
 itemForm.addEventListener('submit', function(event) {
     event.preventDefault();
-    if (!jsonData) {
+    if (!window.jsonData) {
         alert('No data loaded. Please load a file first.');
         return;
     }
@@ -697,13 +690,13 @@ itemForm.addEventListener('submit', function(event) {
 
     if (isNewItem) {
         // Check for ID uniqueness only for new items
-        if (jsonData.items.some(item => item.id === id)) {
+        if (window.jsonData.items.some(item => item.id === id)) {
             alert(`An item with ID ${id} already exists. Please choose a unique ID.`);
             return;
         }
     } else if (oldId !== id) {
         // ID has changed for an existing item, check for uniqueness against OTHER items
-        if (jsonData.items.some(item => item.id === id && item.id !== oldId)) {
+        if (window.jsonData.items.some(item => item.id === id && item.id !== oldId)) {
             alert(`An item with ID ${id} already exists (collides with another item). Please choose a unique ID.`);
             return;
         }
@@ -733,7 +726,7 @@ itemForm.addEventListener('submit', function(event) {
     if (predecessors.length > 0) {
         predecessors = predecessors.filter(predId => {
             if (predId === id) return false; // Cannot be its own predecessor
-            const exists = jsonData.items.some(i => i.id === predId);
+            const exists = window.jsonData.items.some(i => i.id === predId);
             if (!exists) {
                 alert(`Warning: Predecessor ID ${predId} does not exist and will be ignored.`);
             }
@@ -762,15 +755,15 @@ itemForm.addEventListener('submit', function(event) {
 
     if (isNewItem) {
         // Add new item
-        jsonData.items.push(newItemData);
+        window.jsonData.items.push(newItemData);
     } else {
         // Update existing item
-        const existingItemIndex = jsonData.items.findIndex(item => item.id === oldId);
+        const existingItemIndex = window.jsonData.items.findIndex(item => item.id === oldId);
         if (existingItemIndex > -1) {
             // If ID changed, update predecessors in other items first
             if (oldId !== id) {
-                jsonData.items.forEach(item => {
-                    if (item.id === oldId && item !== jsonData.items[existingItemIndex]) return; // Skip self if somehow it lists itself (should not happen)
+                window.jsonData.items.forEach(item => {
+                    if (item.id === oldId && item !== window.jsonData.items[existingItemIndex]) return; // Skip self if somehow it lists itself (should not happen)
 
                     if (Array.isArray(item.predecessors)) {
                         const predIndex = item.predecessors.indexOf(oldId);
@@ -782,7 +775,7 @@ itemForm.addEventListener('submit', function(event) {
                     }
                 });
             }
-            jsonData.items[existingItemIndex] = newItemData; // Update the item itself
+            window.jsonData.items[existingItemIndex] = newItemData; // Update the item itself
         } else {
             alert(`Error: Original item with ID ${oldId} not found for update. This should not happen.`);
             return; // Avoid further issues
@@ -818,33 +811,43 @@ function closeBucketModal() {
  * @param {string} bucketName - The name of the bucket to delete.
  */
 function deleteBucket(bucketName) {
-    if (!jsonData || !jsonData.buckets) return;
+    if (!window.jsonData) return;
 
-    if (!confirm(`Are you sure you want to delete the bucket "${bucketName}"? This will also delete ALL items within this bucket.`)) {
-        return;
+    const itemsInBucket = window.jsonData.items.filter(item => item.bucket === bucketName);
+    
+    let confirmDelete = false;
+    if (itemsInBucket.length > 0) {
+        confirmDelete = confirm(`Are you sure you want to delete the bucket "${bucketName}"? This will also delete ${itemsInBucket.length} item(s) within it.`);
+    } else {
+        confirmDelete = confirm(`Are you sure you want to delete the empty bucket "${bucketName}"?`);
     }
 
-    const bucketIndex = jsonData.buckets.findIndex(b => b.name === bucketName);
-    if (bucketIndex > -1) {
-        jsonData.buckets.splice(bucketIndex, 1);
-        // Remove items associated with this bucket
-        jsonData.items = jsonData.items.filter(item => item.bucket !== bucketName);
-        // Since items are removed, we also need to update predecessors in other items
-        jsonData.items.forEach(item => {
-            if (Array.isArray(item.predecessors)) {
-                item.predecessors = item.predecessors.filter(predId => jsonData.items.some(i => i.id === predId));
-                if (item.predecessors.length === 0) delete item.predecessors;
-                else if (item.predecessors.length === 1) item.predecessors = item.predecessors[0];
-            }
-             else if (item.predecessors && !jsonData.items.some(i => i.id === item.predecessors)) {
-                delete item.predecessors;
+    if (confirmDelete) {
+        // First, collect all IDs of items that will be deleted
+        const idsToDelete = new Set(itemsInBucket.map(item => item.id));
+
+        // If no items to delete, just remove the bucket and refresh
+        if (idsToDelete.size === 0) {
+            window.jsonData.buckets = window.jsonData.buckets.filter(b => b.name !== bucketName);
+            refreshDisplayAndData();
+            return;
+        }
+
+        // Remove the items from the main items array
+        window.jsonData.items = window.jsonData.items.filter(item => !idsToDelete.has(item.id));
+
+        // Go through all remaining items and remove any dependencies on the deleted items
+        window.jsonData.items.forEach(item => {
+            if (item.predecessors && item.predecessors.length > 0) {
+                item.predecessors = item.predecessors.filter(pId => !idsToDelete.has(pId));
             }
         });
 
+        // Finally, remove the bucket itself
+        window.jsonData.buckets = window.jsonData.buckets.filter(b => b.name !== bucketName);
+
+        // Refresh everything
         refreshDisplayAndData();
-        rebuildAllUniqueTagsAndRefreshFilters();
-    } else {
-        alert('Bucket not found for deletion.');
     }
 }
 
@@ -861,7 +864,7 @@ if (addBucketButton) {
  */
 bucketForm.addEventListener('submit', function(event) {
     event.preventDefault();
-    if (!jsonData) {
+    if (!window.jsonData) {
         alert('No data loaded. Please load a file first.');
         return;
     }
@@ -874,12 +877,12 @@ bucketForm.addEventListener('submit', function(event) {
         return;
     }
 
-    if (jsonData.buckets.some(b => b.name === name)) {
+    if (window.jsonData.buckets.some(b => b.name === name)) {
         alert('A bucket with this name already exists.');
         return;
     }
 
-    jsonData.buckets.push({ name, description });
+    window.jsonData.buckets.push({ name, description });
     closeBucketModal();
     refreshDisplayAndData();
     rebuildAllUniqueTagsAndRefreshFilters();
@@ -901,7 +904,7 @@ if (analyticsToggle && analyticsContent && analyticsToggleIndicator) {
             localStorage.setItem('analyticsCollapsed', 'false');
         }
         requestAnimationFrame(() => {
-             if (jsonData && typeof getFilteredDataForArrows === 'function') {
+             if (window.jsonData && typeof getFilteredDataForArrows === 'function') {
                  drawDependencyArrows(getFilteredDataForArrows());
             }
         });
@@ -921,7 +924,7 @@ if (filtersToggle && allFiltersContainer && filtersToggleIndicator) {
         }
         // Redraw arrows as collapsing filters might change layout
         requestAnimationFrame(() => {
-             if (jsonData && typeof getFilteredDataForArrows === 'function') {
+             if (window.jsonData && typeof getFilteredDataForArrows === 'function') {
                  drawDependencyArrows(getFilteredDataForArrows());
             }
         });
@@ -991,79 +994,34 @@ function handleDragLeave(event) {
  */
 function handleDrop(event, targetBucketName) {
     event.preventDefault();
-    const droppedItemId = parseInt(event.dataTransfer.getData('text/plain'));
-    
-    const swimlaneElement = event.currentTarget; // This is the swimlane div
-    swimlaneElement.classList.remove('drag-over-target');
+    event.target.closest('.swimlane').classList.remove('drag-over');
 
-    if (!jsonData || !jsonData.items || isNaN(droppedItemId)) {
-        return;
+    const itemId = parseInt(event.dataTransfer.getData('text/plain'), 10);
+    if (!itemId || !window.jsonData || !window.jsonData.items) return;
+
+    const item = window.jsonData.items.find(i => i.id === itemId);
+
+    if (item && item.bucket !== targetBucketName) {
+        // Get the original bucket of the dropped item to check for dependencies
+        const originalBucketName = item.bucket;
+        
+        // Find the index of the item in its original bucket's item list
+        const itemsInOriginalBucket = window.jsonData.items.filter(i => i.bucket === originalBucketName);
+        const itemIndexInOriginalBucket = itemsInOriginalBucket.findIndex(i => i.id === itemId);
+
+        // Check if the dropped item has any items depending on it within the same original bucket
+        const hasDependenciesInSameBucket = itemsInOriginalBucket.some(otherItem => 
+            otherItem.predecessors && otherItem.predecessors.includes(itemId)
+        );
+
+        item.bucket = targetBucketName;
+        renderSwimlanes(window.jsonData); // Re-render the swimlanes to show the change
+        
+        // Redraw arrows immediately after re-rendering
+        requestAnimationFrame(() => {
+            drawDependencyArrows(getFilteredDataForArrows());
+        });
     }
-
-    const draggedItemOriginalIndex = jsonData.items.findIndex(item => item.id === droppedItemId);
-    if (draggedItemOriginalIndex === -1) {
-        return; // Item not found
-    }
-
-    // Retrieve and remove the item from its original position
-    const [draggedItemObject] = jsonData.items.splice(draggedItemOriginalIndex, 1);
-    
-    // Update its bucket property
-    draggedItemObject.bucket = targetBucketName;
-
-    let insertAtIndex = -1;
-
-    // Determine the reference item card, if any, under the drop point
-    const directTargetElement = document.elementFromPoint(event.clientX, event.clientY);
-    let referenceItemCard = null;
-    if (directTargetElement) {
-        referenceItemCard = directTargetElement.closest('.itemCard');
-    }
-
-    if (referenceItemCard && parseInt(referenceItemCard.dataset.id) !== draggedItemObject.id) {
-        // Dropped onto a different item card
-        const referenceItemId = parseInt(referenceItemCard.dataset.id);
-        // Find the index of this reference item in the *current* (modified) jsonData.items array
-        const referenceItemNewIndex = jsonData.items.findIndex(item => item.id === referenceItemId);
-
-        if (referenceItemNewIndex !== -1) {
-            const rect = referenceItemCard.getBoundingClientRect();
-            if (event.clientY < rect.top + rect.height / 2) {
-                // Drop occurred in the top half of the reference item card -> insert before
-                insertAtIndex = referenceItemNewIndex;
-            } else {
-                // Drop occurred in the bottom half -> insert after
-                insertAtIndex = referenceItemNewIndex + 1;
-            }
-        }
-    }
-
-    if (insertAtIndex !== -1) {
-        jsonData.items.splice(insertAtIndex, 0, draggedItemObject);
-    } else {
-        // Dropped on swimlane background, on the item itself, or other edge case.
-        // Attempt to append to the items of the target bucket logically.
-        let lastIndexOfTargetBucketInCurrentArray = -1;
-        for (let i = jsonData.items.length - 1; i >= 0; i--) {
-            if (jsonData.items[i].bucket === targetBucketName) {
-                lastIndexOfTargetBucketInCurrentArray = i;
-                break;
-            }
-        }
-
-        if (lastIndexOfTargetBucketInCurrentArray !== -1) {
-            // Insert after the last known item of this bucket in the current array
-            jsonData.items.splice(lastIndexOfTargetBucketInCurrentArray + 1, 0, draggedItemObject);
-        } else {
-            // Target bucket has no items in the current array (could be first item for this bucket)
-            // or if it was the only item and moved to a different bucket.
-            // Fallback: append to the very end of the main items list.
-            jsonData.items.push(draggedItemObject);
-        }
-    }
-    
-    refreshDisplayAndData();
-    rebuildAllUniqueTagsAndRefreshFilters();
 }
 
 /**
@@ -1295,14 +1253,14 @@ function renderFilterUI() {
  * Displays the results in the #analyticsContent element.
  */
 function calculateAndRenderAnalytics() {
-    if (!jsonData || !jsonData.items) {
-        analyticsContent.innerHTML = '<p>No data loaded for analytics.</p>';
+    const analyticsContent = document.getElementById('analyticsContent');
+    if (!analyticsContent) return;
+    if (!window.jsonData || !window.jsonData.items) {
+        analyticsContent.innerHTML = '<p>No item data to analyze.</p>';
         return;
     }
 
-    const effortsByTag = {};
-    const grandTotals = { design: 0, build: 0, test: 0, total: 0, itemCount: 0 };
-    const statusOrder = ['new', 'on_hold', 'in_progress', 'completed']; // Define status order for rendering
+    const statusOrder = ['completed', 'on_hold', 'in_progress', 'new'];
     const statusColors = {
         'new': '#6c757d', // Grey
         'in_progress': '#0d6efd', // Blue
@@ -1310,11 +1268,17 @@ function calculateAndRenderAnalytics() {
         'completed': '#198754'   // Green
     };
 
-    // Use the original, unfiltered jsonData.items for analytics
-    jsonData.items.forEach(item => {
-        const design = parseFloat(item.design_effort || 0);
-        const build = parseFloat(item.build_effort || 0);
-        const test = parseFloat(item.test_effort || 0);
+    const effortsByTag = {};
+    const grandTotals = { design: 0, build: 0, test: 0, total: 0, itemCount: 0 };
+
+    // Use the filtered data for analytics calculation
+    const filteredData = getFilteredDataForArrows();
+
+    filteredData.items.forEach(item => {
+        // Calculate total effort for the item, defaulting to 0 if efforts are not defined
+        const design = item.design_effort || 0;
+        const build = item.build_effort || 0;
+        const test = item.test_effort || 0;
         item.total_effort = design + build + test; // Store total on item for display on card
 
         grandTotals.design += design;
@@ -1448,7 +1412,7 @@ function calculateAndRenderAnalytics() {
  * This is crucial after item additions, modifications (name changes), or deletions.
  */
 function rebuildAllUniqueTagsAndRefreshFilters() {
-    if (!jsonData || !jsonData.items) return;
+    if (!window.jsonData || !window.jsonData.items) return;
 
     allUniqueTags.clear();
     // Reset color mapping to ensure consistency if prefixes change
@@ -1456,7 +1420,7 @@ function rebuildAllUniqueTagsAndRefreshFilters() {
     tagColorMap = {};
     nextColorIndex = 0;
 
-    jsonData.items.forEach(item => {
+    window.jsonData.items.forEach(item => {
         // Ensure all items have their tags extracted/updated if they exist
         if (item.name) { // Check if item.name exists before trying to extract tags
              item.extractedTags = extractTagsFromString(item.name);
@@ -1509,10 +1473,14 @@ document.addEventListener('DOMContentLoaded', () => {
             // If switching to the plan tab, redraw arrows
             if (tabId === 'planTab') {
                 requestAnimationFrame(() => {
-                    if (jsonData) {
+                    if (window.jsonData) {
                         drawDependencyArrows(getFilteredDataForArrows());
                     }
                 });
+            } else if (tabId === 'dashboardTab') {
+                if (typeof initDashboard === 'function') {
+                    initDashboard();
+                }
             }
         });
     });

@@ -6,4 +6,3 @@ alwaysApply: true
 - Always use native javascript without dependencies or server.
 - Javascript files are in the "JS" folder. 
 - io.js handles all input/output.
-- use style.css for all styling

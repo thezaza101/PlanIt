@@ -1,6 +1,7 @@
 const fileInput = document.getElementById('fileInput');
 const saveButton = document.getElementById('saveButton');
 const saveAsExcelButton = document.getElementById('saveAsExcelButton');
+const fileNameHeader = document.getElementById('fileNameHeader');
 
 /**
  * Handles the file input 'change' event.
@@ -12,13 +13,20 @@ fileInput.addEventListener('change', function(event) {
         return;
     }
     originalFileName = file.name;
+    
+    // Display the file name in the header
+    if (fileNameHeader) {
+        const nameWithoutExtension = originalFileName.replace(/\.(json|xlsx)$/i, '');
+        fileNameHeader.textContent = nameWithoutExtension;
+    }
+
     const reader = new FileReader();
 
     if (file.name.endsWith('.json')) {
         reader.onload = function(e) {
             try {
                 const content = e.target.result;
-                jsonData = JSON.parse(content);
+                window.jsonData = JSON.parse(content);
                 processJsonData(); // Refactored logic
             } catch (error) {
                 handleFileLoadError('Error parsing JSON file: ' + error.message);
@@ -71,7 +79,21 @@ fileInput.addEventListener('change', function(event) {
                 const detailSheet = workbook.Sheets['detail'];
                 const details = detailSheet ? XLSX.utils.sheet_to_json(detailSheet) : [];
 
-                jsonData = {
+                // 5. Get "Dashboard" data (optional)
+                const dashboardSheet = workbook.Sheets['dashboard'];
+                // Use header: 1 to get an array of arrays, which is what the dashboard parser expects
+                const dashboardData = dashboardSheet ? XLSX.utils.sheet_to_json(dashboardSheet, { header: 1 }) : [];
+
+                // Store all sheets in excelData for other modules to use
+                window.excelData = {
+                    'Work Items': items,
+                    'SETTINGS': settingsData,
+                    'Todo': todos,
+                    'detail': details,
+                    'dashboard': dashboardData
+                };
+
+                window.jsonData = {
                     link_base: link_base,
                     buckets: buckets,
                     items: items,
@@ -99,9 +121,9 @@ fileInput.addEventListener('change', function(event) {
  */
 function processJsonData() {
     // Process main plan items
-    if (jsonData.items) {
+    if (window.jsonData && window.jsonData.items) {
         allUniqueTags.clear();
-        jsonData.items.forEach(item => {
+        window.jsonData.items.forEach(item => {
             // Standardize predecessors
             let predecessors = [];
             if (item.predecessor) {
@@ -126,7 +148,7 @@ function processJsonData() {
         });
         renderFilterUI();
         calculateAndRenderAnalytics();
-        renderSwimlanes(jsonData);
+        renderSwimlanes(window.jsonData);
         populateBucketSelector();
     } else {
         // Even if there are no plan items, clear the display
@@ -135,12 +157,17 @@ function processJsonData() {
 
     // Process todo items
     if (typeof initializeTodo === 'function') {
-        initializeTodo(jsonData.todos || []);
+        initializeTodo(window.excelData['Todo'] || window.jsonData.todos || []);
     }
 
     // Pass detail data to a new initializer in todo_detail.js if it exists
     if (typeof initializeDetails === 'function') {
-        initializeDetails(jsonData.details || []);
+        initializeDetails(window.excelData['detail'] || window.jsonData.details || []);
+    }
+
+    // Initialize dashboard if function exists
+    if (typeof initDashboard === 'function') {
+        initDashboard();
     }
 
     // Redraw arrows after a short delay to ensure DOM is updated
@@ -160,8 +187,11 @@ function handleFileLoadError(message) {
     // jsonDisplay.value = `Error: ${message}`;
     swimlaneContainer.innerHTML = '';
     arrowCanvas.innerHTML = '';
-    jsonData = null;
+    window.jsonData = null;
     itemBucketSelect.innerHTML = '';
+    if (fileNameHeader) {
+        fileNameHeader.textContent = '';
+    }
 }
 
 /**
@@ -170,12 +200,12 @@ function handleFileLoadError(message) {
  * @returns {Array|undefined} The array of data objects for that sheet.
  */
 function getSheetData(sheetName) {
-    if (!jsonData) return undefined;
+    if (!window.jsonData) return undefined;
     
     // Simple mapping from singular name to plural key in jsonData
     const key = sheetName.toLowerCase() === 'todo' ? 'todos' : `${sheetName.toLowerCase()}s`;
 
-    return jsonData[key];
+    return window.jsonData[key];
 }
 
 /**
@@ -183,13 +213,13 @@ function getSheetData(sheetName) {
  * Converts the content of the JSON display textarea to a Blob and initiates a download.
  */
 saveButton.addEventListener('click', function() {
-    if (!jsonData) {
+    if (!window.jsonData) {
         alert("No data to save.");
         return;
     }
     try {
         // Ensure the data is up-to-date from the textarea
-        const jsonString = JSON.stringify(jsonData, null, 4);
+        const jsonString = JSON.stringify(window.jsonData, null, 4);
         const blob = new Blob([jsonString], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -205,7 +235,7 @@ saveButton.addEventListener('click', function() {
 });
 
 saveAsExcelButton.addEventListener('click', function() {
-    if (!jsonData) {
+    if (!window.jsonData) {
         alert("No data available to save as Excel.");
         return;
     }
@@ -213,7 +243,7 @@ saveAsExcelButton.addEventListener('click', function() {
     try {
         // 1. Create 'Work Items' sheet from jsonData.items
         // Create a deep copy to avoid modifying the original data
-        const itemsForExport = JSON.parse(JSON.stringify(jsonData.items));
+        const itemsForExport = JSON.parse(JSON.stringify(window.jsonData.items));
         
         // Clean up items before export: remove runtime-added properties
         itemsForExport.forEach(item => {
@@ -234,13 +264,13 @@ saveAsExcelButton.addEventListener('click', function() {
         const settingsData = [
             ["PLANNER_SETTINGS"], // Title
             [], // Spacer row
-            ["link_base", jsonData.link_base || ''],
+            ["link_base", window.jsonData.link_base || ''],
             [], // Spacer row
             ["buckets"], // Section header
             ["name", "description"] // Column headers for buckets
         ];
         
-        jsonData.buckets.forEach(bucket => {
+        window.jsonData.buckets.forEach(bucket => {
             settingsData.push([bucket.name, bucket.description]);
         });
         
@@ -251,20 +281,10 @@ saveAsExcelButton.addEventListener('click', function() {
         if (typeof getTodoData === 'function') {
             const todoData = getTodoData();
             if (todoData && todoData.length > 0) {
-                 // Clean up for export if needed (e.g. converting arrays to strings)
-                const todosForExport = JSON.parse(JSON.stringify(todoData));
-                todosForExport.forEach(item => {
-                    if (Array.isArray(item.Tags)) {
-                        item.Tags = item.Tags.join(',');
-                    }
-                    if (Array.isArray(item['Connected To'])) {
-                        item['Connected To'] = item['Connected To'].join(',');
-                    }
-                });
-                wsTodo = XLSX.utils.json_to_sheet(todosForExport);
+                wsTodo = XLSX.utils.json_to_sheet(todoData);
             }
         }
-
+        
         // 4. Create 'detail' sheet if data exists
         let wsDetail = null;
         if (typeof getDetailData === 'function') {
@@ -274,20 +294,31 @@ saveAsExcelButton.addEventListener('click', function() {
             }
         }
 
-        // 5. Create Workbook and add all sheets
+        // 5. Create 'dashboard' sheet if data exists
+        let wsDashboard = null;
+        if (window.excelData && window.excelData['dashboard'] && window.excelData['dashboard'].length > 0) {
+            wsDashboard = XLSX.utils.aoa_to_sheet(window.excelData['dashboard']);
+        }
+
+        // Create a new workbook
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, wsSettings, "SETTINGS");
-        XLSX.utils.book_append_sheet(wb, wsItems, "Work Items");
+
+        // Append the worksheets
+        XLSX.utils.book_append_sheet(wb, wsItems, 'Work Items');
+        XLSX.utils.book_append_sheet(wb, wsSettings, 'SETTINGS');
         if (wsTodo) {
-            XLSX.utils.book_append_sheet(wb, wsTodo, "Todo");
+            XLSX.utils.book_append_sheet(wb, wsTodo, 'Todo');
         }
         if (wsDetail) {
-            XLSX.utils.book_append_sheet(wb, wsDetail, "detail");
+            XLSX.utils.book_append_sheet(wb, wsDetail, 'detail');
         }
-        
-        // 6. Download the workbook
-        const newFileName = originalFileName.replace(/(\.json|\.xlsx)$/, '_edited.xlsx');
-        XLSX.writeFile(wb, newFileName);
+        if (wsDashboard) {
+            XLSX.utils.book_append_sheet(wb, wsDashboard, 'dashboard');
+        }
+
+        // 6. Trigger download
+        const excelFileName = originalFileName.replace(/(\.json|\.xlsx)$/, '_edited.xlsx');
+        XLSX.writeFile(wb, excelFileName);
 
     } catch (error) {
         alert('Error saving Excel file: ' + error.message);

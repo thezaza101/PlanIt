@@ -4,30 +4,30 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JSON Editor</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="CSS/style.css">
     <link rel="stylesheet" href="CSS/todo_detail.css">
+    <link rel="stylesheet" href="CSS/dash.css">
 </head>
 <body>
-    <h1>Local JSON File Reader/Editor</h1>
-
-    <div class="main-controls-container">
-        <div class="control-group">
-            <label for="fileInput">Select JSON or Excel File:</label>
-            <input type="file" id="fileInput" accept=".json,.xlsx">
+    <div class="app-header-container">
+        <div class="header-left-panel">
+            <h2 id="fileNameHeader"></h2>
+            <div class="tab-navigation">
+                <button class="tab-btn" data-tab="planTab">Plan</button>
+                <button class="tab-btn" data-tab="todoTab">Todo</button>
+                <button class="tab-btn active" data-tab="dashboardTab">Dashboard</button>
+            </div>
         </div>
-        <div class="control-group">
-            <button id="saveButton">Save/Download JSON</button>
+        <div class="header-right-panel">
+            <div class="control-group">
+                <label for="fileInput" class="file-input-label btn">Browse...</label>
+                <input type="file" id="fileInput" accept=".json,.xlsx">
+            </div>
             <button id="saveAsExcelButton">Save as Excel</button>
         </div>
     </div>
 
-    <div class="tab-navigation">
-        <button class="tab-btn active" data-tab="planTab">Plan</button>
-        <button class="tab-btn" data-tab="todoTab">Todo</button>
-        <button class="tab-btn" data-tab="dashboardTab">Dashboard</button>
-    </div>
-
-    <div id="planTab" class="tab-content active">
+    <div id="planTab" class="tab-content">
         <div id="filtersSection">
             <h2 id="filtersToggle">
                 Filters <span id="filtersToggleIndicator">(Hide)</span>
@@ -86,6 +86,9 @@
                 <div id="todoTableContainer">
                     <!-- Todo table will be rendered here by JavaScript -->
                 </div>
+                <div id="todoPaginationContainer">
+                    <!-- Pagination controls will be rendered here -->
+                </div>
             </div>
         </div>
         <div id="graph-view-container">
@@ -97,10 +100,35 @@
         </div>
     </div>
 
-    <div id="dashboardTab" class="tab-content">
-        <!-- Content for the Dashboard tab will go here -->
-        <h2>Dashboard</h2>
-        <p>This is where the dashboard will be displayed.</p>
+    <div id="dashboardTab" class="tab-content active">
+        <div id="dashboardPlanSummarySection" class="dashboard-section">
+            <h2>Plan Summary by Tag</h2>
+            <div id="planSummaryFiltersContainer" class="dashboard-container">
+                <!-- Tag filter checkboxes will be rendered here -->
+            </div>
+            <div id="planSummaryChartContainer" class="dashboard-container">
+                <!-- The summary bar chart will be rendered here -->
+            </div>
+        </div>
+        <div id="dashboardDisplayedItemsSection" class="dashboard-section">
+            <h2>Displayed Items</h2>
+            <div id="displayedItemsContainer" class="dashboard-container"></div>
+            <button id="addDisplayedItemButton" class="add-btn">+ Add Item to Display</button>
+        </div>
+        <div id="dashboardTodoSummarySection" class="dashboard-section">
+            <h2>Todo Summary</h2>
+            <div id="todoSummaryContainer" class="dashboard-container"></div>
+        </div>
+        <div id="dashboardLinksSection" class="dashboard-section">
+            <h2>Important Links</h2>
+            <div id="linksContainer" class="dashboard-container"></div>
+            <button id="addLinkButton" class="add-btn">+ Add Link</button>
+        </div>
+        <div id="dashboardContactsSection" class="dashboard-section">
+            <h2>Contacts</h2>
+            <div id="contactsContainer" class="dashboard-container"></div>
+            <button id="addContactButton" class="add-btn">+ Add Contact</button>
+        </div>
     </div>
 
     <!-- Item Add/Edit Modal -->
@@ -275,10 +303,30 @@
         </div>
     </div>
 
+    <!-- Dashboard Item Modal -->
+    <div id="dashboardItemModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" id="closeDashboardItemModalBtn">&times;</span>
+            <h2 id="dashboardModalTitle">Add/Edit Item</h2>
+            <form id="dashboardItemForm">
+                <!-- Form fields will be dynamically generated here by JavaScript -->
+                <div id="dashboardFormFields"></div>
+                
+                <div class="modal-buttons">
+                    <button type="button" id="deleteDashboardItemButton" class="item-btn-delete" style="display: none;">Delete</button>
+                    <div style="flex-grow: 1;"></div>
+                    <button type="button" id="cancelDashboardItemButton">Cancel</button>
+                    <button type="submit" id="saveDashboardItemButton">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script src="JS/xlsx.full.min.js"></script>
     <script src="JS/io.js" defer></script>
     <script src="JS/app.js" defer></script>
     <script src="JS/todo.js" defer></script>
     <script src="JS/todo_detail.js" defer></script>
+    <script src="JS/dash.js" defer></script>
 </body>
 </html>
